@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   MessageSquare, Users, Hash, Send, Paperclip, Image as ImageIcon, 
   FileText, Sun, Moon, Search, Phone, Video, CheckCheck, 
-  Download, Code, X, Zap, Tablet, Monitor, UserCheck, ArrowRight
+  Download, Code, X, Zap, Tablet, Monitor, UserCheck, ArrowRight, BellRing
 } from 'lucide-react';
 
 interface Message {
@@ -11,7 +11,7 @@ interface Message {
   sender: string;
   text?: string;
   time: string;
-  type: 'text' | 'code' | 'file' | 'image';
+  type: 'text' | 'code' | 'file' | 'image' | 'poke';
   isMe: boolean;
   code?: string;
   fileName?: string;
@@ -35,7 +35,6 @@ interface Member {
 }
 
 export default function App() {
-  // Estado de Autenticación Local (Pantalla de Ingreso)
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>('Franco Sierralta');
 
@@ -46,12 +45,14 @@ export default function App() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [deviceMode, setDeviceMode] = useState<'responsive' | 'ipad'>('responsive');
   
+  // Estado para la animación de zumbido (shake)
+  const [isShaking, setIsShaking] = useState<boolean>(false);
+
   // Estados para llamadas
   const [isInCall, setIsInCall] = useState<boolean>(false);
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
   const [callTimer, setCallTimer] = useState<number>(0);
 
-  // Canales y miembros
   const [channels] = useState<Channel[]>([
     { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo', unread: 0 },
     { id: 'gen-2', name: 'logistica-china', description: 'Embarques, contenedores y courier', unread: 2 },
@@ -100,6 +101,26 @@ export default function App() {
     return `${mins.toString().padStart(2, '0')}:${remainingSecs.toString().padStart(2, '0')}`;
   };
 
+  // Función para disparar el Zumbido estilo Messenger
+  const triggerPoke = () => {
+    setIsShaking(true);
+    setTimeout(() => setIsShaking(false), 600); // Duración de la vibración
+
+    const pokeMessage: Message = {
+      id: Date.now(),
+      sender: userName,
+      text: '⚡ ¡ENVIÓ UN ZUMBIDO!',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: 'poke',
+      isMe: true
+    };
+
+    setMessages(prev => ({
+      ...prev,
+      [currentChatId]: [...(prev[currentChatId] || []), pokeMessage]
+    }));
+  };
+
   const handleSendMessage = (customType: 'text' | 'code' | 'file' | 'image' = 'text', contentData: Partial<Message> = {}) => {
     if (!inputText.trim() && customType === 'text') return;
 
@@ -131,7 +152,6 @@ export default function App() {
     });
   };
 
-  // --- SI NO ESTÁ LOGUEADO, MUESTRA LA PANTALLA DE INGRESO ---
   if (!isLoggedIn) {
     return (
       <div className="h-screen w-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 font-sans select-none">
@@ -165,20 +185,35 @@ export default function App() {
               </button>
             </div>
           </div>
-
-          <div className="text-center">
-            <span className="text-[10px] text-slate-500">De China al Mundo • Sistema Operativo Interno</span>
-          </div>
         </div>
       </div>
     );
   }
 
-  // --- VISTA PRINCIPAL DEL CHAT ---
   return (
-    <div className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} h-screen w-screen flex flex-col overflow-hidden font-sans select-none touch-pan-y`}>
+    <div className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} h-screen w-screen flex flex-col overflow-hidden font-sans select-none touch-pan-y ${isShaking ? 'animate-bounce' : ''}`}>
       
-      {/* BARRA SUPERIOR DE CONTROL DE DISPOSITIVO (Adaptación iPad 2) */}
+      {/* Estilos CSS en línea para la animación de temblor de zumbido */}
+      <style jsx global>{`
+        @keyframes shake {
+          0% { transform: translate(1px, 1px) rotate(0deg); }
+          10% { transform: translate(-1px, -2px) rotate(-1deg); }
+          20% { transform: translate(-3px, 0px) rotate(1deg); }
+          30% { transform: translate(3px, 2px) rotate(0deg); }
+          40% { transform: translate(1px, -1px) rotate(1deg); }
+          50% { transform: translate(-1px, 2px) rotate(-1deg); }
+          60% { transform: translate(-3px, 1px) rotate(0deg); }
+          70% { transform: translate(3px, 1px) rotate(-1deg); }
+          80% { transform: translate(-1px, -1px) rotate(1deg); }
+          90% { transform: translate(1px, 2px) rotate(0deg); }
+          100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .animate-bounce {
+          animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+      `}</style>
+
+      {/* BARRA SUPERIOR */}
       <div className={`h-11 px-4 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between text-xs z-20 shrink-0`}>
         <div className="flex items-center gap-2">
           <Zap className="w-4 h-4 text-blue-500" />
@@ -248,7 +283,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* Listado con scroll táctil optimizado */}
+            {/* Listado */}
             <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
               {activeTab === 'channels' ? (
                 channels.map(ch => (
@@ -287,7 +322,7 @@ export default function App() {
               )}
             </div>
 
-            {/* Botón para cambiar de usuario */}
+            {/* Footer Sesión */}
             <div className={`p-3 border-t ${darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'} flex items-center justify-between`}>
               <div className="flex items-center gap-2.5 truncate">
                 <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">
@@ -340,29 +375,45 @@ export default function App() {
               {(messages[currentChatId] || []).map((msg) => (
                 <div key={msg.id} className={`flex flex-col ${msg.isMe ? 'items-end' : 'items-start'}`}>
                   {!msg.isMe && <span className="text-[10px] font-semibold mb-1 ml-1 opacity-70">{msg.sender}</span>}
-                  <div className={`max-w-md rounded-2xl p-3.5 shadow-sm ${
-                    msg.isMe 
-                      ? 'bg-blue-600 text-white rounded-br-none' 
-                      : darkMode ? 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
-                  }`}>
-                    <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                    <div className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${msg.isMe ? 'text-blue-100' : 'opacity-60'}`}>
-                      <span>{msg.time}</span>
-                      {msg.isMe && <CheckCheck className="w-3 h-3" />}
+                  
+                  {msg.type === 'poke' ? (
+                    <div className="my-1 px-4 py-2 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-full text-xs font-bold flex items-center gap-2 animate-pulse">
+                      <BellRing className="w-4 h-4" /> {msg.sender} envió un Zumbido ⚡
                     </div>
-                  </div>
+                  ) : (
+                    <div className={`max-w-md rounded-2xl p-3.5 shadow-sm ${
+                      msg.isMe 
+                        ? 'bg-blue-600 text-white rounded-br-none' 
+                        : darkMode ? 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
+                    }`}>
+                      <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                      <div className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${msg.isMe ? 'text-blue-100' : 'opacity-60'}`}>
+                        <span>{msg.time}</span>
+                        {msg.isMe && <CheckCheck className="w-3 h-3" />}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Mensaje */}
+            {/* Input Mensaje y Botón de Zumbido */}
             <div className={`p-3 sm:p-4 border-t ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
               <div className="flex items-center gap-2">
                 <label className={`p-3 rounded-xl border cursor-pointer ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`}>
                   <Paperclip className="w-4 h-4" />
                   <input type="file" onChange={handleFileUpload} className="hidden" />
                 </label>
+
+                {/* BOTÓN DE ZUMBIDO */}
+                <button 
+                  onClick={triggerPoke}
+                  className="p-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl shadow-md transition-transform active:scale-90 font-bold flex items-center gap-1"
+                  title="Enviar Zumbido"
+                >
+                  <BellRing className="w-4 h-4" />
+                </button>
                 
                 <div className={`flex-1 flex items-center rounded-xl border px-3 py-2 ${darkMode ? 'bg-slate-950 border-slate-800 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
                   <input 
