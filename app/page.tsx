@@ -1,14 +1,12 @@
 'use client';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Hash, Send, Paperclip, Sun, Moon, Phone, Video, CheckCheck, 
   Zap, ArrowRight, BellRing, Menu, X, Plus, Edit2, Trash2, Check, AlertCircle, PhoneCall
 } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const SUPABASE_URL = 'https://fedzgvgobjeokxfhvmok.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlZHpndmdvYmplb2t4Zmh2bW9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1MzE4OTksImV4cCI6MjExMDEwNzg5OX0.tnxHWDOWQySJ8VDIQhYX5hmVHGvJCD7UlMrw7XeI2ZY';
 
 interface Message {
   id: string;
@@ -26,13 +24,45 @@ interface Channel {
   description: string;
 }
 
+// Cliente REST liviano y directo: no congela jamás el inicio de React 19 / Next 16
+async function sbFetch(path: string, method: string = 'GET', body?: unknown) {
+  const headers: Record<string, string> = {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+  if (method !== 'GET') {
+    headers['Prefer'] = 'return=representation';
+  }
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    let errText = `HTTP ${res.status}`;
+    try {
+      const errJson = await res.json();
+      if (errJson?.message) errText = errJson.message;
+    } catch {}
+    throw new Error(errText);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [userName, setUserName] = useState<string>('');
+  const [userName, setUserName] = useState<string>('Franco Sierralta');
   const [darkMode, setDarkMode] = useState<boolean>(true);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
-  const [channels, setChannels] = useState<Channel[]>([]);
+  const [channels, setChannels] = useState<Channel[]>([
+    { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo' },
+    { id: 'gen-2', name: 'logistica-china', description: 'Embarques, contenedores y courier' },
+    { id: 'gen-3', name: 'soporte-it', description: 'Sistemas y automatizaciones' },
+  ]);
   const [currentChatId, setCurrentChatId] = useState<string>('gen-1');
   const [isAddingChannel, setIsAddingChannel] = useState<boolean>(false);
   const [newChannelName, setNewChannelName] = useState<string>('');
@@ -46,14 +76,13 @@ export default function App() {
   const [dbError, setDbError] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState<boolean>(false);
 
-  // Estados de Llamada / Videollamada Real (Jitsi WebRTC)
   const [isInCall, setIsInCall] = useState<boolean>(false);
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastProcessedMsgId = useRef<string | null>(null);
 
-  const playMsnNudgeEffect = () => {
+  const playMsnNudgeEffect = useCallback(() => {
     setIsShaking(false);
     setTimeout(() => setIsShaking(true), 10);
     setTimeout(() => setIsShaking(false), 900);
@@ -78,81 +107,57 @@ export default function App() {
         osc.start(ctx.currentTime + t);
         osc.stop(ctx.currentTime + t + 0.07);
       });
-    } catch {
-      // Ignorar si el navegador bloquea el audio sin interacción previa
-    }
-  };
-
-  useEffect(() => {
-    const savedName = localStorage.getItem('nefa_username');
-    if (savedName) {
-      setUserName(savedName);
-      setIsLoggedIn(true);
-    }
+    } catch {}
   }, []);
 
-  const handleLogin = () => {
-    if (!userName.trim()) return;
-    localStorage.setItem('nefa_username', userName.trim());
+  useEffect(() => {
+    try {
+      const savedName = localStorage.getItem('nefa_username');
+      if (savedName && savedName.trim()) {
+        setUserName(savedName.trim());
+        setIsLoggedIn(true);
+      }
+    } catch {}
+  }, []);
+
+  const handleLogin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const clean = userName.trim() || 'Franco Sierralta';
+    try {
+      localStorage.setItem('nefa_username', clean);
+    } catch {}
+    setUserName(clean);
     setIsLoggedIn(true);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('nefa_username');
+    try {
+      localStorage.removeItem('nefa_username');
+    } catch {}
     setIsLoggedIn(false);
   };
 
-  // 1. Cargar Canales y escuchar cambios
-  useEffect(() => {
-    if (!isLoggedIn) return;
-
-    const fetchChannels = async () => {
-      const { data, error } = await supabase
-        .from('channels')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        setDbError(`Error de base de datos (Canales): ${error.message}`);
-      } else if (data) {
+  const fetchChannels = useCallback(async () => {
+    try {
+      const data = await sbFetch('channels?select=*&order=created_at.asc');
+      if (Array.isArray(data) && data.length > 0) {
         setChannels(data);
-        if (data.length > 0 && !data.some(c => c.id === currentChatId)) {
-          setCurrentChatId(data[0].id);
-        }
+        setCurrentChatId(prev => data.some((c: Channel) => c.id === prev) ? prev : data[0].id);
       }
-    };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      setDbError(`Error Canales: ${msg}`);
+    }
+  }, []);
 
-    fetchChannels();
-
-    const chSub = supabase
-      .channel('public-channels')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, () => {
-        fetchChannels();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(chSub);
-    };
-  }, [isLoggedIn]);
-
-  // 2. Cargar Mensajes y escuchar nuevos mensajes + zumbidos en vivo
-  useEffect(() => {
-    if (!isLoggedIn || !currentChatId) return;
-
-    const fetchMessages = async (isInitial = false) => {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('channel_id', currentChatId)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        setDbError(`Error al leer mensajes: ${error.message}`);
-      } else if (data) {
+  const fetchMessages = useCallback(async (isInitial = false) => {
+    if (!currentChatId) return;
+    try {
+      const data = await sbFetch(`messages?select=*&channel_id=eq.${encodeURIComponent(currentChatId)}&order=created_at.asc`);
+      if (Array.isArray(data)) {
         setDbError(null);
         if (data.length > 0) {
-          const latest = data[data.length - 1];
+          const latest = data[data.length - 1] as Message;
           if (!isInitial && lastProcessedMsgId.current && lastProcessedMsgId.current !== latest.id) {
             if (latest.type === 'poke' && latest.sender.toLowerCase() !== userName.toLowerCase()) {
               playMsnNudgeEffect();
@@ -162,42 +167,28 @@ export default function App() {
         }
         setMessages(data);
       }
-    };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      setDbError(`Error Mensajes: ${msg}`);
+    }
+  }, [currentChatId, userName, playMsnNudgeEffect]);
 
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    fetchChannels();
     fetchMessages(true);
 
-    const pollInterval = setInterval(() => fetchMessages(false), 2500);
+    const interval = setInterval(() => {
+      fetchMessages(false);
+      fetchChannels();
+    }, 2000);
 
-    const msgSub = supabase
-      .channel(`room-${currentChatId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages'
-      }, (payload) => {
-        const incoming = payload.new as Message;
-        if (incoming.channel_id === currentChatId) {
-          if (incoming.type === 'poke' && incoming.sender.toLowerCase() !== userName.toLowerCase() && lastProcessedMsgId.current !== incoming.id) {
-            playMsnNudgeEffect();
-          }
-          lastProcessedMsgId.current = incoming.id;
-          setMessages((prev) => {
-            if (prev.some(m => m.id === incoming.id)) return prev;
-            return [...prev, incoming];
-          });
-        }
-      })
-      .subscribe();
-
-    return () => {
-      clearInterval(pollInterval);
-      supabase.removeChannel(msgSub);
-    };
-  }, [currentChatId, isLoggedIn, userName]);
+    return () => clearInterval(interval);
+  }, [isLoggedIn, currentChatId, fetchChannels, fetchMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages.length]);
 
   const handleCreateChannel = async () => {
     if (!newChannelName.trim()) return;
@@ -208,16 +199,17 @@ export default function App() {
       description: newChannelDesc.trim() || 'Canal del equipo'
     };
 
-    const { error } = await supabase.from('channels').insert([newCh]);
-    if (error) {
-      setDbError(`No se pudo crear el canal: ${error.message}`);
-    } else {
+    try {
+      await sbFetch('channels', 'POST', [newCh]);
       setChannels(prev => [...prev, newCh]);
       setCurrentChatId(newCh.id);
       setNewChannelName('');
       setNewChannelDesc('');
       setIsAddingChannel(false);
       setSidebarOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error';
+      setDbError(`No se pudo crear el canal: ${msg}`);
     }
   };
 
@@ -233,30 +225,30 @@ export default function App() {
     if (!editChannelName.trim()) return;
     const cleanName = editChannelName.trim().toLowerCase().replace(/\s+/g, '-');
 
-    const { error } = await supabase
-      .from('channels')
-      .update({ name: cleanName, description: editChannelDesc.trim() })
-      .eq('id', id);
-
-    if (error) {
-      setDbError(`No se pudo editar el canal: ${error.message}`);
-    } else {
+    try {
+      await sbFetch(`channels?id=eq.${encodeURIComponent(id)}`, 'PATCH', {
+        name: cleanName,
+        description: editChannelDesc.trim(),
+      });
       setChannels(prev => prev.map(c => c.id === id ? { ...c, name: cleanName, description: editChannelDesc.trim() } : c));
       setEditingChannelId(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error';
+      setDbError(`No se pudo editar el canal: ${msg}`);
     }
   };
 
   const handleDeleteChannel = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (channels.length <= 1) return;
-    const { error } = await supabase.from('channels').delete().eq('id', id);
-    if (!error) {
+    try {
+      await sbFetch(`channels?id=eq.${encodeURIComponent(id)}`, 'DELETE');
       const remaining = channels.filter(c => c.id !== id);
       setChannels(remaining);
       if (currentChatId === id && remaining.length > 0) {
         setCurrentChatId(remaining[0].id);
       }
-    }
+    } catch {}
   };
   const triggerPoke = async () => {
     playMsnNudgeEffect();
@@ -272,11 +264,14 @@ export default function App() {
 
     lastProcessedMsgId.current = newMessage.id;
     setMessages(prev => [...prev, newMessage]);
-    const { error } = await supabase.from('messages').insert([newMessage]);
-    if (error) setDbError(`Error al enviar zumbido: ${error.message}`);
+    try {
+      await sbFetch('messages', 'POST', [newMessage]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error';
+      setDbError(`Error al enviar zumbido: ${msg}`);
+    }
   };
 
-  // Iniciar o unirse a una llamada real con Jitsi WebRTC
   const startCall = async (mode: 'voice' | 'video', announce = true) => {
     setCallType(mode);
     setIsInCall(true);
@@ -293,7 +288,9 @@ export default function App() {
       };
       lastProcessedMsgId.current = newMessage.id;
       setMessages(prev => [...prev, newMessage]);
-      await supabase.from('messages').insert([newMessage]);
+      try {
+        await sbFetch('messages', 'POST', [newMessage]);
+      } catch {}
     }
   };
 
@@ -314,11 +311,12 @@ export default function App() {
     setMessages(prev => [...prev, newMessage]);
     setInputText('');
 
-    const { error } = await supabase.from('messages').insert([newMessage]);
-    if (error) {
-      setDbError(`No se guardó el mensaje en Supabase: ${error.message}`);
-    } else {
+    try {
+      await sbFetch('messages', 'POST', [newMessage]);
       setDbError(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error';
+      setDbError(`No se guardó el mensaje: ${msg}`);
     }
   };
 
@@ -330,7 +328,6 @@ export default function App() {
 
   const activeChannel = channels.find(c => c.id === currentChatId);
 
-  // Armamos la URL única de la sala de llamada para el canal activo
   const safeRoomName = `NEFA_Software_Room_${currentChatId.replace(/[^a-zA-Z0-9]/g, '_')}`;
   const jitsiUrl = `https://meet.jit.si/${safeRoomName}#userInfo.displayName="${encodeURIComponent(userName)}"&config.prejoinPageEnabled=false&config.startWithVideoMuted=${callType === 'voice'}&config.disableDeepLinking=true`;
 
@@ -346,25 +343,31 @@ export default function App() {
             <p className="text-xs text-slate-400">Ingresa tu nombre para conectarte en vivo con el equipo</p>
           </div>
 
-          <div className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">Tu Nombre:</label>
               <input 
                 type="text" 
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                 placeholder="Ej. Franco, Ariel, Melany..."
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 outline-none focus:border-blue-500"
               />
             </div>
 
             <button 
-              onClick={handleLogin}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95"
+              type="submit"
+              onClick={() => handleLogin()}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
             >
               Entrar al Chat <ArrowRight className="w-4 h-4" />
             </button>
+          </form>
+
+          <div className="pt-2 border-t border-slate-800 text-center">
+            <a href="/ipad/index.html" className="text-[11px] text-blue-400 hover:underline font-medium">
+              ¿No responde o estás en iPad 2? Entrar a la versión ligera →
+            </a>
           </div>
         </div>
       </div>
@@ -709,7 +712,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* SALA DE LLAMADA / VIDEOLLAMADA EN VIVO (JITSI MEET WEBRTC) */}
+      {/* SALA DE LLAMADA / VIDEOLLAMADA EN VIVO */}
       {isInCall && (
         <div className="fixed inset-0 bg-slate-950 z-50 flex flex-col">
           <div className="h-14 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
