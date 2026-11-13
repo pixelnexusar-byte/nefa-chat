@@ -164,14 +164,16 @@
     ui['user-display-name'].textContent = name;
     ui['user-initials'].textContent = name.substring(0, 2).toUpperCase();
     
+    // Forzamos la visualización de la app
     show(ui.login, false);
     show(ui.app, true);
     
+    // Cargamos los canales
     loadChannels(function() {
       renderSidebar();
       updateChatHeader();
       loadMessages();
-      setupRealtime(); // Activa WebSockets
+      setupRealtime();
     });
   };
 
