@@ -6,31 +6,25 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Nefa Chat">
-  <meta name="format-detection" content="telephone=no">
   <title>Nefa Chat · iPad</title>
   <link rel="apple-touch-icon" href="/ipad/icon.png">
   <link rel="icon" type="image/png" href="/ipad/icon.png">
   <link rel="stylesheet" href="/ipad/app.css">
 </head>
 <body>
-  <noscript>Activá JavaScript en Ajustes &gt; Safari &gt; Avanzado para usar Nefa Chat.</noscript>
+  <noscript>Activá JavaScript para usar Nefa Chat.</noscript>
   
-  <!-- PANTALLA DE LOGIN -->
+  <!-- PANTALLA DE LOGIN SIMPLE (COMO TU APP) -->
   <section id="login" class="login-screen">
     <div class="login-card">
-      <img class="login-logo" src="/ipad/icon.png" width="76" height="76" alt="Nefa Chat">
-      <p class="eyebrow">NEFA CHAT</p>
-      <h1>Tu chat, a mano.</h1>
-      <p class="login-copy">Conversaciones en tu iPad.</p>
-      <form id="login-form" action="/ipad/index.html" method="post">
-        <label for="username">Usuario</label>
-        <input id="username" name="username" type="text" placeholder="Tu usuario" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
-        <label for="password">Contraseña</label>
-        <input id="password" name="password" type="password" placeholder="Tu contraseña" autocomplete="current-password" required>
-        <p id="login-error" class="form-error" role="alert"></p>
-        <button id="login-button" class="primary" type="submit" disabled>Comprobando conexión…</button>
+      <img class="login-logo" src="/ipad/icon.png" width="76" height="76" alt="Nefa">
+      <h1>NEFA Internal Workspace</h1>
+      <p class="login-copy">Ingresá tu nombre para acceder al canal de comunicación del equipo</p>
+      <form id="login-form">
+        <label for="username">Tu Nombre o Perfil:</label>
+        <input id="username" name="username" type="text" placeholder="Ej: Franco Sierralta" required>
+        <button id="login-button" class="primary" type="submit">Ingresar al Chat →</button>
       </form>
-      <p class="login-note">Acceso con tu cuenta habitual</p>
     </div>
   </section>
 
@@ -40,60 +34,39 @@
       <img class="brand-icon" src="/ipad/icon.png" width="42" height="42" alt="">
       <div class="brand"><strong>NEFA CHAT</strong><span>Vista iPad</span></div>
       <div class="top-actions">
-        <span id="sync" class="sync" role="status">Conectando…</span>
-        <button id="refresh" class="small-button" type="button">Actualizar</button>
-        <button id="menu-button" class="small-button" type="button" aria-expanded="false" aria-controls="menu">Menú</button>
+        <span id="sync" class="sync">Conectando…</span>
+        <button id="refresh" class="small-button">Actualizar</button>
+        <button id="menu-button" class="small-button">Menú</button>
       </div>
       <div id="menu" class="menu hidden">
         <p id="user-name"></p>
-        <button id="install-app" type="button">Agregar a Inicio</button>
-        <button id="logout" type="button">Cerrar sesión</button>
+        <button id="logout">Cerrar sesión</button>
       </div>
     </header>
-    
-    <div class="summary" aria-label="Resumen">
-      <div><span class="metric-label">CHATS</span><strong id="total">—</strong></div>
-      <div><span class="metric-label">ACTIVOS</span><strong id="active">—</strong></div>
-      <div><span class="metric-label">CERRADOS</span><strong id="closed">—</strong></div>
-      <p>Todo tu seguimiento.<br><span>En un solo lugar.</span></p>
-    </div>
-    
-    <p id="notice" class="notice hidden" role="alert"></p>
-    
     <main id="workspace" class="workspace">
-      <aside class="inbox" aria-label="Contactos">
+      <aside class="inbox">
         <div class="inbox-head">
-          <h2>Conversaciones <span id="result-count"></span></h2>
-          <input id="search" type="search" placeholder="Buscar nombre o mensaje" autocapitalize="none" autocorrect="off">
-          <select id="filter"><option value="">Todos los estados</option></select>
+          <h2>Conversaciones</h2>
+          <input id="search" type="search" placeholder="Buscar...">
         </div>
-        <div id="contacts" class="contacts"><p class="empty">Cargando conversaciones…</p></div>
+        <div id="contacts" class="contacts"></div>
       </aside>
-      
-      <section id="detail" class="detail" aria-label="Detalle">
-        <div id="welcome" class="welcome"><div class="welcome-symbol">N</div><h2>Cada conversación cuenta.</h2><p>Elegí un contacto para ver el historial.</p></div>
+      <section id="detail" class="detail">
+        <div id="welcome" class="welcome"><h2>Elegí un chat</h2></div>
         <div id="selected" class="hidden">
           <header class="client-header">
-            <button id="back" class="back" type="button" aria-label="Volver">‹</button>
+            <button id="back" class="back">‹</button>
             <div id="client-avatar" class="avatar"></div>
-            <div class="client-title"><h2 id="client-name"></h2><p id="client-phone"></p></div>
-            <span id="client-status" class="status"></span>
+            <div class="client-title"><h2 id="client-name"></h2></div>
           </header>
-          <div id="messages" class="messages" tabindex="0" aria-label="Historial"></div>
+          <div id="messages" class="messages"></div>
           <form id="reply-form" class="composer">
-            <div class="reply-field">
-              <textarea id="reply-text" placeholder="Escribí tu respuesta…" rows="2" maxlength="12000"></textarea>
-            </div>
-            <button id="send-button" class="send-button" type="submit" disabled>Enviar</button>
-            <p id="send-status" class="send-status" role="status">Tu respuesta se envía por WhatsApp.</p>
+            <textarea id="reply-text" placeholder="Escribí tu respuesta…"></textarea>
+            <button id="send-button" class="send-button" type="submit">Enviar</button>
           </form>
         </div>
       </section>
     </main>
-  </div>
-
-  <div id="install-dialog" class="dialog-screen hidden" role="dialog" aria-modal="true">
-    <div class="dialog-card"><p class="eyebrow">APP EN IPAD</p><h2>Siempre a un toque.</h2><p>En Safari, tocá <strong>Compartir</strong> (el cuadrado con la flecha), elegí <strong>Agregar a inicio</strong> y confirmá <strong>Agregar</strong>.</p><button id="close-install" class="primary" type="button">Entendido</button></div>
   </div>
   
   <script src="/ipad/app.js"></script>
