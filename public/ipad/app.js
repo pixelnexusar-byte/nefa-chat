@@ -1,4 +1,4 @@
-/* NEFA Software Chat - ES5 Puro Compatible con iPad 2 (iOS 9) y Celulares */
+/* NEFA Software Chat - ES5 Puro con soporte de Llamadas Jitsi */
 (function () {
   'use strict';
 
@@ -18,7 +18,9 @@
     'error-banner', 'login', 'app', 'sidebar', 'login-form', 'username',
     'user-display-name', 'user-initials', 'logout-btn', 'new-channel-btn',
     'sidebar-list', 'chat-name', 'chat-desc', 'messages-container',
-    'chat-input', 'send-btn', 'poke-btn', 'menu-btn', 'close-sidebar-btn'
+    'chat-input', 'send-btn', 'poke-btn', 'menu-btn', 'close-sidebar-btn',
+    'voice-call-btn', 'video-call-btn', 'call-modal', 'call-modal-title',
+    'call-iframe-wrap', 'close-call-btn', 'call-external-link'
   ];
   for (var i = 0; i < ids.length; i++) {
     ui[ids[i]] = document.getElementById(ids[i]);
@@ -47,7 +49,6 @@
     return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
   }
 
-  // Efecto Zumbido MSN (Sacudida + Audio WebKit para iPad + Vibración)
   function triggerMsnNudgeEffect() {
     var appEl = ui['app'];
     appEl.className = appEl.className.replace(/\s*shake-active\b/g, '');
@@ -84,7 +85,6 @@
     } catch (e) {}
   }
 
-  // Petición HTTP directa a Supabase REST API (100% compatible con iPad 2 / iOS 9)
   function apiRequest(method, path, body, callback) {
     var xhr = new XMLHttpRequest();
     xhr.open(method, SUPABASE_URL + '/rest/v1/' + path, true);
@@ -120,6 +120,35 @@
       if (String(state.channels[i].id) === String(id)) return state.channels[i];
     }
     return null;
+  }
+
+  // Abrir sala Jitsi sincronizada con la app principal
+  function openCallRoom(mode, announce) {
+    var safeId = String(state.currentChatId).replace(/[^a-zA-Z0-9]/g, '_');
+    var roomName = 'NEFA_Software_Room_' + safeId;
+    var isVoiceOnly = (mode === 'voice') ? 'true' : 'false';
+    var url = 'https://meet.jit.si/' + roomName +
+      '#userInfo.displayName="' + encodeURIComponent(state.user) + '"' +
+      '&config.prejoinPageEnabled=false&config.startWithVideoMuted=' + isVoiceOnly +
+      '&config.disableDeepLinking=true';
+
+    var current = findChannelById(state.currentChatId);
+    var chName = current ? current.name : 'general';
+    ui['call-modal-title'].textContent = '● Sala en vivo: #' + chName + (mode === 'video' ? ' (Videollamada)' : ' (Voz)');
+    ui['call-external-link'].href = url;
+
+    ui['call-iframe-wrap'].innerHTML = '<iframe src="' + url + '" allow="camera; microphone; fullscreen; autoplay"></iframe>';
+    show(ui['call-modal'], true);
+
+    if (announce) {
+      var label = (mode === 'video') ? 'Videollamada' : 'Llamada de voz';
+      sendMessage('📞 Inició una ' + label + ' en vivo', 'call');
+    }
+  }
+
+  function closeCallRoom() {
+    ui['call-iframe-wrap'].innerHTML = '';
+    show(ui['call-modal'], false);
   }
 
   function loadChannels(callback) {
@@ -192,8 +221,8 @@
         editBtn.onclick = function (e) {
           e.stopPropagation();
           var newName = prompt('Nuevo nombre del canal:', ch.name);
-          if (!newName || !newName.trim()) return;
-          var clean = newName.trim().toLowerCase().replace(/\s+/g, '-');
+          if (!newName || !newName.replace(/^\s+|\s+$/g, '')) return;
+          var clean = newName.replace(/^\s+|\s+$/g, '').toLowerCase().replace(/\s+/g, '-');
           var newDesc = prompt('Descripción del canal:', ch.description || '');
           apiRequest('PATCH', 'channels?id=eq.' + encodeURIComponent(ch.id), {
             name: clean,
@@ -258,6 +287,25 @@
         poke.textContent = '🔔 ¡' + m.sender + ' ha enviado un Zumbido! ⚡ (' + (m.time || '') + ')';
         pWrap.appendChild(poke);
         container.appendChild(pWrap);
+      } else if (m.type === 'call') {
+        var cWrap = document.createElement('div');
+        cWrap.className = 'poke-wrapper';
+        var card = document.createElement('div');
+        card.className = 'call-card';
+        var title = document.createElement('strong');
+        title.textContent = m.sender + ' ' + (m.text || 'inició una llamada') + ' (' + (m.time || '') + ')';
+        card.appendChild(title);
+
+        var joinBtn = document.createElement('button');
+        joinBtn.type = 'button';
+        joinBtn.className = 'btn-join-call';
+        joinBtn.textContent = 'Unirse ahora';
+        joinBtn.onclick = function () {
+          openCallRoom('video', false);
+        };
+        card.appendChild(joinBtn);
+        cWrap.appendChild(card);
+        container.appendChild(cWrap);
       } else {
         var wrapper = document.createElement('div');
         wrapper.className = 'message' + (isMe ? ' is-me' : '');
@@ -351,6 +399,18 @@
     ui['sidebar'].className = ui['sidebar'].className.replace(/\s*open\b/g, '');
   };
 
+  ui['voice-call-btn'].onclick = function () {
+    openCallRoom('voice', true);
+  };
+
+  ui['video-call-btn'].onclick = function () {
+    openCallRoom('video', true);
+  };
+
+  ui['close-call-btn'].onclick = function () {
+    closeCallRoom();
+  };
+
   ui['send-btn'].onclick = function () {
     var text = ui['chat-input'].value.replace(/^\s+|\s+$/g, '');
     if (text) {
@@ -372,7 +432,6 @@
     sendMessage('⚡ ¡Acaba de enviar un Zumbido!', 'poke');
   };
 
-  // Auto-inicio si ya había sesión guardada
   var savedUser = localStorage.getItem('nefa_username') || localStorage.getItem('nefa_user');
   if (savedUser) {
     startSession(savedUser);

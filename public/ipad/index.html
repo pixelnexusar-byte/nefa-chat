@@ -66,10 +66,16 @@
     <!-- ÁREA DE CHAT -->
     <main class="chat-area">
       <header class="chat-header">
-        <button id="menu-btn" class="btn-menu" type="button">☰</button>
-        <div class="chat-title">
-          <h2 id="chat-name"># general</h2>
-          <p id="chat-desc">Coordinación general del equipo</p>
+        <div class="header-left">
+          <button id="menu-btn" class="btn-menu" type="button">☰</button>
+          <div class="chat-title">
+            <h2 id="chat-name"># general</h2>
+            <p id="chat-desc">Coordinación general del equipo</p>
+          </div>
+        </div>
+        <div class="call-actions">
+          <button id="voice-call-btn" class="btn-call" type="button" title="Llamada de voz">📞</button>
+          <button id="video-call-btn" class="btn-call" type="button" title="Videollamada">📹</button>
         </div>
       </header>
 
@@ -81,6 +87,18 @@
         <button id="send-btn" class="btn-send" type="button">Enviar</button>
       </div>
     </main>
+  </div>
+
+  <!-- MODAL DE LLAMADA / VIDEOLLAMADA -->
+  <div id="call-modal" class="call-modal hidden">
+    <div class="call-modal-header">
+      <span id="call-modal-title">● Sala en vivo</span>
+      <div>
+        <a id="call-external-link" href="#" target="_blank" class="btn-ext-call">Abrir en pestaña</a>
+        <button id="close-call-btn" class="btn-hangup" type="button">Salir de la Sala</button>
+      </div>
+    </div>
+    <div id="call-iframe-wrap" class="call-iframe-wrap"></div>
   </div>
 
   <script src="/ipad/app.js"></script>

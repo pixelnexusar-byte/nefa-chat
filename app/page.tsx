@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Hash, Send, Paperclip, Sun, Moon, Phone, Video, CheckCheck, 
-  Zap, ArrowRight, BellRing, Menu, X, Plus, Edit2, Trash2, Check, AlertCircle
+  Zap, ArrowRight, BellRing, Menu, X, Plus, Edit2, Trash2, Check, AlertCircle, PhoneCall
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -46,25 +46,22 @@ export default function App() {
   const [dbError, setDbError] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState<boolean>(false);
 
+  // Estados de Llamada / Videollamada Real (Jitsi WebRTC)
   const [isInCall, setIsInCall] = useState<boolean>(false);
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
-  const [callTimer, setCallTimer] = useState<number>(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastProcessedMsgId = useRef<string | null>(null);
 
-  // Función que ejecuta el combo clásico de MSN: Sacudida + Sonido + Vibración
   const playMsnNudgeEffect = () => {
     setIsShaking(false);
     setTimeout(() => setIsShaking(true), 10);
     setTimeout(() => setIsShaking(false), 900);
 
-    // Vibración física en celulares compatibles
     if (typeof window !== 'undefined' && 'vibrate' in navigator) {
       navigator.vibrate([120, 40, 120, 40, 180, 40, 250]);
     }
 
-    // Sonido clásico sintetizado (no requiere archivos mp3 externos)
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
@@ -156,7 +153,6 @@ export default function App() {
         setDbError(null);
         if (data.length > 0) {
           const latest = data[data.length - 1];
-          // Si llegó un zumbido nuevo por polling que aún no sacudió la pantalla
           if (!isInitial && lastProcessedMsgId.current && lastProcessedMsgId.current !== latest.id) {
             if (latest.type === 'poke' && latest.sender.toLowerCase() !== userName.toLowerCase()) {
               playMsnNudgeEffect();
@@ -202,16 +198,6 @@ export default function App() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isInCall) {
-      interval = setInterval(() => setCallTimer(prev => prev + 1), 1000);
-    } else {
-      setCallTimer(0);
-    }
-    return () => clearInterval(interval);
-  }, [isInCall]);
 
   const handleCreateChannel = async () => {
     if (!newChannelName.trim()) return;
@@ -272,12 +258,6 @@ export default function App() {
       }
     }
   };
-  const formatTime = (secs: number) => {
-    const mins = Math.floor(secs / 60);
-    const remainingSecs = secs % 60;
-    return `${mins.toString().padStart(2, '0')}:${remainingSecs.toString().padStart(2, '0')}`;
-  };
-
   const triggerPoke = async () => {
     playMsnNudgeEffect();
 
@@ -294,6 +274,27 @@ export default function App() {
     setMessages(prev => [...prev, newMessage]);
     const { error } = await supabase.from('messages').insert([newMessage]);
     if (error) setDbError(`Error al enviar zumbido: ${error.message}`);
+  };
+
+  // Iniciar o unirse a una llamada real con Jitsi WebRTC
+  const startCall = async (mode: 'voice' | 'video', announce = true) => {
+    setCallType(mode);
+    setIsInCall(true);
+
+    if (announce) {
+      const callLabel = mode === 'video' ? 'Videollamada' : 'Llamada de voz';
+      const newMessage: Message = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        channel_id: currentChatId,
+        sender: userName,
+        text: `📞 Inició una ${callLabel} en vivo`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: 'call'
+      };
+      lastProcessedMsgId.current = newMessage.id;
+      setMessages(prev => [...prev, newMessage]);
+      await supabase.from('messages').insert([newMessage]);
+    }
   };
 
   const handleSendMessage = async (customType: string = 'text', textContent?: string) => {
@@ -328,6 +329,10 @@ export default function App() {
   };
 
   const activeChannel = channels.find(c => c.id === currentChatId);
+
+  // Armamos la URL única de la sala de llamada para el canal activo
+  const safeRoomName = `NEFA_Software_Room_${currentChatId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const jitsiUrl = `https://meet.jit.si/${safeRoomName}#userInfo.displayName="${encodeURIComponent(userName)}"&config.prejoinPageEnabled=false&config.startWithVideoMuted=${callType === 'voice'}&config.disableDeepLinking=true`;
 
   if (!isLoggedIn) {
     return (
@@ -369,7 +374,6 @@ export default function App() {
   return (
     <div className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} h-[100dvh] w-screen flex flex-col overflow-hidden font-sans ${isShaking ? 'msn-buzz-active' : ''}`}>
       
-      {/* ANIMACIÓN AUTÉNTICA DE ZUMBIDO MSN MESSENGER */}
       <style>{`
         @keyframes msn-nudge {
           0% { transform: translate(0, 0) rotate(0deg); }
@@ -399,7 +403,6 @@ export default function App() {
         }
       `}</style>
 
-      {/* BANNER DE ERROR SI SUPABASE BLOQUEA ALGO */}
       {dbError && (
         <div className="bg-red-600 text-white px-4 py-2 text-xs flex items-center justify-between z-50 shrink-0">
           <div className="flex items-center gap-2">
@@ -410,7 +413,6 @@ export default function App() {
         </div>
       )}
 
-      {/* CONTENEDOR PRINCIPAL ADAPTADO A CELULAR Y PC */}
       <div className="flex-1 flex h-full w-full relative overflow-hidden">
 
         {sidebarOpen && (
@@ -595,14 +597,16 @@ export default function App() {
             
             <div className="flex items-center gap-1.5 shrink-0">
               <button 
-                onClick={() => { setIsInCall(true); setCallType('voice'); }} 
-                className={`p-2.5 rounded-xl border ${darkMode ? 'border-slate-800 bg-slate-800/50 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
+                onClick={() => startCall('voice', true)} 
+                className={`p-2.5 rounded-xl border transition-colors ${darkMode ? 'border-slate-800 bg-slate-800/50 hover:bg-emerald-600/20 hover:border-emerald-500/40 text-slate-300 hover:text-emerald-400' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
+                title="Iniciar llamada de voz"
               >
                 <Phone className="w-4 h-4" />
               </button>
               <button 
-                onClick={() => { setIsInCall(true); setCallType('video'); }} 
-                className={`p-2.5 rounded-xl border ${darkMode ? 'border-slate-800 bg-slate-800/50 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
+                onClick={() => startCall('video', true)} 
+                className={`p-2.5 rounded-xl border transition-colors ${darkMode ? 'border-slate-800 bg-slate-800/50 hover:bg-blue-600/20 hover:border-blue-500/40 text-slate-300 hover:text-blue-400' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
+                title="Iniciar videollamada"
               >
                 <Video className="w-4 h-4" />
               </button>
@@ -628,6 +632,24 @@ export default function App() {
                       <div className="my-1.5 px-4 py-2 bg-amber-500/20 border-2 border-amber-500 text-amber-400 rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-amber-500/10">
                         <BellRing className="w-4 h-4 animate-ping" />
                         <span>¡{msg.sender} ha enviado un Zumbido! ⚡ ({msg.time})</span>
+                      </div>
+                    ) : msg.type === 'call' ? (
+                      <div className="my-1.5 p-3.5 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 rounded-2xl text-xs flex flex-col sm:flex-row items-start sm:items-center gap-3 shadow-lg">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 bg-emerald-500 text-slate-950 rounded-xl animate-pulse">
+                            <PhoneCall className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-white">{msg.sender} {msg.text}</p>
+                            <p className="text-[10px] text-emerald-400">Sala de #{activeChannel?.name} • {msg.time}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => startCall('video', false)}
+                          className="w-full sm:w-auto px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition-transform active:scale-95 text-center"
+                        >
+                          Unirse ahora
+                        </button>
                       </div>
                     ) : (
                       <div className={`max-w-[85%] sm:max-w-md rounded-2xl px-3.5 py-2.5 shadow-sm ${
@@ -687,23 +709,31 @@ export default function App() {
         </div>
       </div>
 
-      {/* MODAL DE LLAMADA */}
+      {/* SALA DE LLAMADA / VIDEOLLAMADA EN VIVO (JITSI MEET WEBRTC) */}
       {isInCall && (
-        <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-6 text-white">
-          <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-3xl font-bold mb-4 shadow-xl animate-pulse">
-            {userName.substring(0, 2).toUpperCase()}
+        <div className="fixed inset-0 bg-slate-950 z-50 flex flex-col">
+          <div className="h-14 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+              <span className="font-bold text-xs sm:text-sm text-white">
+                Sala en vivo: #{activeChannel?.name || 'general'} ({callType === 'video' ? 'Videollamada' : 'Voz'})
+              </span>
+            </div>
+            <button 
+              onClick={() => setIsInCall(false)}
+              className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl shadow transition-transform active:scale-95"
+            >
+              Salir de la Sala
+            </button>
           </div>
-          <h3 className="text-xl font-bold mb-1">
-            {callType === 'video' ? 'Videollamada en curso' : 'Llamada de voz en curso'}
-          </h3>
-          <p className="text-sm text-slate-400 mb-8 font-mono">{formatTime(callTimer)}</p>
-
-          <button 
-            onClick={() => setIsInCall(false)}
-            className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg transition-transform active:scale-95"
-          >
-            Colgar Llamada
-          </button>
+          <div className="flex-1 w-full bg-black relative">
+            <iframe
+              src={jitsiUrl}
+              allow="camera; microphone; fullscreen; display-capture; autoplay"
+              className="w-full h-full border-0"
+              title="NEFA Live Call"
+            />
+          </div>
         </div>
       )}
     </div>
