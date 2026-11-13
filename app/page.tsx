@@ -4,41 +4,16 @@ import {
   Users, Hash, Send, Paperclip, Sun, Moon, Phone, Video, CheckCheck, 
   Zap, Tablet, Monitor, ArrowRight, BellRing, ChevronLeft
 } from 'lucide-react';
-
-interface Message {
-  id: number;
-  sender: string;
-  text?: string;
-  time: string;
-  type: 'text' | 'code' | 'file' | 'image' | 'poke';
-  isMe: boolean;
-}
-
-interface Channel {
-  id: string;
-  name: string;
-  description: string;
-  unread: number;
-}
-
-interface Member {
-  id: string;
-  name: string;
-  role: string;
-  status: 'online' | 'busy' | 'offline';
-  avatar: string;
-}
+import { supabase } from '../lib/supabase'; // Importamos Supabase
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>('Franco Sierralta');
   const [darkMode, setDarkMode] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'channels' | 'dms'>('channels');
-  const [currentChatId, setCurrentChatId] = useState<string>('gen-1');
+  const [currentChatId, setCurrentChatId] = useState<number>(1); // Ahora el ID es numérico en Supabase
   const [inputText, setInputText] = useState<string>('');
   const [deviceMode, setDeviceMode] = useState<'responsive' | 'ipad'>('responsive');
-  
-  // ESTADO CLAVE PARA CELULARES: Controla si vemos el menú o el chat
   const [isMobileChatOpen, setIsMobileChatOpen] = useState<boolean>(false);
 
   const [isShaking, setIsShaking] = useState<boolean>(false);
@@ -46,34 +21,91 @@ export default function App() {
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
   const [callTimer, setCallTimer] = useState<number>(0);
 
-  const [channels] = useState<Channel[]>([
-    { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo', unread: 0 },
-    { id: 'gen-2', name: 'logistica-china', description: 'Embarques, contenedores y courier', unread: 2 },
-    { id: 'gen-3', name: 'soporte-it', description: 'Sistemas y automatizaciones', unread: 1 },
-  ]);
+  // Estados que ahora vienen de Supabase
+  const [channels, setChannels] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]); // Los mensajes del canal actual
 
-  const [teamMembers] = useState<Member[]>([
+  const teamMembers = [
     { id: 'usr-1', name: 'Ariel Diaz', role: 'Co-Founder', status: 'online', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150' },
     { id: 'usr-2', name: 'Melany', role: 'Atención', status: 'online', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150' },
-  ]);
-
-  const [messages, setMessages] = useState<Record<string, Message[]>>({
-    'gen-1': [
-      { id: 1, sender: 'Ariel Diaz', text: 'Buenos días equipo.', time: '09:15', type: 'text', isMe: false },
-      { id: 2, sender: 'Franco Sierralta', text: 'Todo en orden por acá.', time: '09:20', type: 'text', isMe: true },
-    ],
-    'gen-2': [{ id: 1, sender: 'Franco Sierralta', text: 'Shipping mark: 船標', time: 'Ayer', type: 'text', isMe: true }],
-    'usr-1': [{ id: 1, sender: 'Ariel Diaz', text: '¿Revisaste la API?', time: '11:00', type: 'text', isMe: false }]
-  });
+  ];
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // --- LÓGICA DE SUPABASE ---
+
+  // 1. Cargar canales al iniciar
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, currentChatId]);
+    if (!isLoggedIn) return;
+    
+    supabase.from('channels').select('*').order('id').then(({ data }) => {
+      if (data && data.length > 0) {
+        setChannels(data);
+        setCurrentChatId(data[0].id);
+      }
+    });
+  }, [isLoggedIn]);
+
+  // 2. Cargar mensajes cuando cambia el canal
+  const loadMessages = async (channelId: number) => {
+    const { data } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('channel_id', channelId)
+      .order('created_at', { ascending: true });
+    if (data) setMessages(data);
+  };
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    if (!isLoggedIn || !currentChatId) return;
+    loadMessages(currentChatId);
+
+    // 3. ESCUCHAR MENSAJES EN TIEMPO REAL
+    const subscription = supabase
+      .channel('public:messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${currentChatId}` }, payload => {
+        setMessages(prev => [...prev, payload.new]);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(subscription); };
+  }, [currentChatId, isLoggedIn]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // --- ACCIONES ---
+
+  const handleSendMessage = async (customType: 'text' | 'poke' = 'text', textOverride?: string) => {
+    const textToSend = textOverride || inputText;
+    if (!textToSend.trim()) return;
+
+    setInputText('');
+    
+    // Insertar en Supabase
+    await supabase.from('messages').insert([{
+      channel_id: currentChatId,
+      sender: userName,
+      text: textToSend,
+      type: customType
+    }]);
+    // No hacemos nada más, el WebSocket se encarga de actualizar la pantalla
+  };
+
+  const triggerPoke = () => {
+    setIsShaking(true);
+    setTimeout(() => setIsShaking(false), 600);
+    handleSendMessage('poke', '⚡ ¡ENVIÓ UN ZUMBIDO!');
+  };
+
+  const selectChat = (id: number) => {
+    setCurrentChatId(id);
+    setIsMobileChatOpen(true);
+  };
+
+  useEffect(() => {
+    let interval: any;
     if (isInCall) interval = setInterval(() => setCallTimer(prev => prev + 1), 1000);
     else setCallTimer(0);
     return () => clearInterval(interval);
@@ -81,26 +113,7 @@ export default function App() {
 
   const formatTime = (secs: number) => `${Math.floor(secs / 60).toString().padStart(2, '0')}:${(secs % 60).toString().padStart(2, '0')}`;
 
-  const triggerPoke = () => {
-    setIsShaking(true);
-    setTimeout(() => setIsShaking(false), 600);
-    const pokeMessage: Message = { id: Date.now(), sender: userName, text: '⚡ ¡ENVIÓ UN ZUMBIDO!', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), type: 'poke', isMe: true };
-    setMessages(prev => ({ ...prev, [currentChatId]: [...(prev[currentChatId] || []), pokeMessage] }));
-  };
-
-  const handleSendMessage = (customType: 'text' = 'text') => {
-    if (!inputText.trim()) return;
-    const newMessage: Message = { id: Date.now(), sender: userName, text: inputText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), type: customType, isMe: true };
-    setMessages(prev => ({ ...prev, [currentChatId]: [...(prev[currentChatId] || []), newMessage] }));
-    setInputText('');
-  };
-
-  // Función para seleccionar un chat en celular
-  const selectChat = (id: string) => {
-    setCurrentChatId(id);
-    setIsMobileChatOpen(true); // Abre el chat en pantalla completa
-  };
-
+  // --- RENDERIZADO ---
   if (!isLoggedIn) {
     return (
       <div className="h-screen w-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 font-sans select-none">
@@ -138,27 +151,22 @@ export default function App() {
         .animate-bounce { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
       `}</style>
 
-      {/* BARRA SUPERIOR (Oculta en celular si estás en el chat) */}
       <div className={`h-11 px-4 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between text-xs z-20 shrink-0 ${isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
         <div className="flex items-center gap-2">
           <Zap className="w-4 h-4 text-blue-500" />
           <span className="font-bold hidden sm:inline">NEFA Workspace</span>
           <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">{userName}</span>
         </div>
-        
         <div className="flex items-center gap-2">
           <button onClick={() => setDeviceMode('responsive')} className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1 ${deviceMode === 'responsive' ? 'bg-blue-600 text-white' : 'opacity-70'}`}><Monitor className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Full</span></button>
           <button onClick={() => setDeviceMode('ipad')} className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1 ${deviceMode === 'ipad' ? 'bg-blue-600 text-white' : 'opacity-70'}`}><Tablet className="w-3.5 h-3.5" /> <span className="hidden sm:inline">iPad</span></button>
         </div>
       </div>
 
-      {/* CONTENEDOR PRINCIPAL */}
       <div className="flex-1 flex items-center justify-center overflow-hidden p-0 sm:p-2 bg-black/20">
-        <div className={`flex h-full w-full transition-all duration-300 shadow-2xl overflow-hidden ${
-          deviceMode === 'ipad' ? 'max-w-[1024px] max-h-[768px] rounded-xl border-4 border-slate-700' : 'rounded-none border-0'
-        } ${darkMode ? 'bg-slate-950' : 'bg-white'}`}>
+        <div className={`flex h-full w-full transition-all duration-300 shadow-2xl overflow-hidden ${deviceMode === 'ipad' ? 'max-w-[1024px] max-h-[768px] rounded-xl border-4 border-slate-700' : 'rounded-none border-0'} ${darkMode ? 'bg-slate-950' : 'bg-white'}`}>
 
-          {/* SIDEBAR (Se oculta en celular si el chat está abierto) */}
+          {/* SIDEBAR */}
           <div className={`${isMobileChatOpen ? 'hidden md:flex' : 'flex'} w-full md:w-72 sm:w-80 flex-col border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} z-10 shrink-0`}>
             <div className={`p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex items-center justify-between`}>
               <div className="flex items-center gap-2.5">
@@ -169,19 +177,18 @@ export default function App() {
             </div>
 
             <div className="flex border-b border-slate-700/30 p-2 gap-1.5">
-              <button onClick={() => { setActiveTab('channels'); selectChat(channels[0].id); }} className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 ${activeTab === 'channels' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}><Hash className="w-3.5 h-3.5" /> Canales</button>
-              <button onClick={() => { setActiveTab('dms'); selectChat(teamMembers[0].id); }} className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 ${activeTab === 'dms' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}><Users className="w-3.5 h-3.5" /> Directos</button>
+              <button onClick={() => setActiveTab('channels')} className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 ${activeTab === 'channels' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}><Hash className="w-3.5 h-3.5" /> Canales</button>
+              <button onClick={() => setActiveTab('dms')} className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 ${activeTab === 'dms' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}><Users className="w-3.5 h-3.5" /> Directos</button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
               {activeTab === 'channels' ? channels.map(ch => (
                 <button key={ch.id} onClick={() => selectChat(ch.id)} className={`w-full text-left px-3 py-3 rounded-xl flex items-center justify-between ${currentChatId === ch.id ? 'bg-blue-600/20 text-blue-400' : 'text-slate-300'}`}>
                   <div className="flex items-center gap-2.5 truncate"><Hash className="w-4 h-4 opacity-70" /><span className="text-xs font-medium">{ch.name}</span></div>
-                  {ch.unread > 0 && <span className="px-1.5 py-0.5 text-[10px] bg-blue-600 text-white rounded-full">{ch.unread}</span>}
                 </button>
               )) : teamMembers.map(usr => (
-                <button key={usr.id} onClick={() => selectChat(usr.id)} className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between ${currentChatId === usr.id ? 'bg-blue-600/20 text-blue-400' : 'text-slate-300'}`}>
-                  <div className="flex items-center gap-3 truncate"><img src={usr.avatar} className="w-8 h-8 rounded-full" /><p className="text-xs font-semibold">{usr.name}</p></div>
+                <button key={usr.id} className="w-full text-left px-3 py-2.5 rounded-xl flex items-center gap-3 text-slate-300">
+                  <img src={usr.avatar} className="w-8 h-8 rounded-full" /><p className="text-xs font-semibold">{usr.name}</p>
                 </button>
               ))}
             </div>
@@ -195,20 +202,16 @@ export default function App() {
             </div>
           </div>
 
-          {/* ÁREA DE CHAT (Se oculta en celular si no está abierto) */}
+          {/* ÁREA DE CHAT */}
           <div className={`${isMobileChatOpen ? 'flex' : 'hidden md:flex'} flex-1 flex-col h-full relative overflow-hidden`}>
             <div className={`h-16 px-4 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white'} flex items-center justify-between shrink-0`}>
               <div className="flex items-center gap-2">
-                {/* BOTÓN VOLVER (Solo visible en celular) */}
-                <button onClick={() => setIsMobileChatOpen(false)} className="md:hidden p-2 -ml-2 text-slate-400">
-                  <ChevronLeft className="w-6 h-6" />
-                </button>
+                <button onClick={() => setIsMobileChatOpen(false)} className="md:hidden p-2 -ml-2 text-slate-400"><ChevronLeft className="w-6 h-6" /></button>
                 <div>
-                  <h2 className="font-bold text-xs sm:text-sm">{activeTab === 'channels' ? `# ${channels.find(c => c.id === currentChatId)?.name}` : teamMembers.find(m => m.id === currentChatId)?.name}</h2>
-                  <p className={`text-[10px] text-slate-400`}>{activeTab === 'channels' ? channels.find(c => c.id === currentChatId)?.description : teamMembers.find(m => m.id === currentChatId)?.role}</p>
+                  <h2 className="font-bold text-xs sm:text-sm"># {channels.find(c => c.id === currentChatId)?.name}</h2>
+                  <p className={`text-[10px] text-slate-400`}>{channels.find(c => c.id === currentChatId)?.description}</p>
                 </div>
               </div>
-              
               <div className="flex items-center gap-2">
                 <button onClick={() => { setIsInCall(true); setCallType('voice'); }} className={`p-2 rounded-xl border ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-300' : 'bg-slate-100'}`}><Phone className="w-4 h-4" /></button>
                 <button onClick={() => { setIsInCall(true); setCallType('video'); }} className={`p-2 rounded-xl border ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-300' : 'bg-slate-100'}`}><Video className="w-4 h-4" /></button>
@@ -216,19 +219,22 @@ export default function App() {
             </div>
 
             <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
-              {(messages[currentChatId] || []).map((msg) => (
-                <div key={msg.id} className={`flex flex-col ${msg.isMe ? 'items-end' : 'items-start'}`}>
-                  {!msg.isMe && <span className="text-[10px] font-semibold mb-1 ml-1 opacity-70">{msg.sender}</span>}
-                  {msg.type === 'poke' ? (
-                    <div className="my-1 px-4 py-2 bg-amber-500/20 text-amber-400 rounded-full text-xs font-bold flex items-center gap-2 animate-pulse"><BellRing className="w-4 h-4" /> {msg.sender} envió un Zumbido ⚡</div>
-                  ) : (
-                    <div className={`max-w-[85%] md:max-w-md rounded-2xl p-3.5 ${msg.isMe ? 'bg-blue-600 text-white rounded-br-none' : darkMode ? 'bg-slate-900 text-slate-100 rounded-bl-none' : 'bg-white text-slate-800 rounded-bl-none'}`}>
-                      <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                      <div className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${msg.isMe ? 'text-blue-100' : 'opacity-60'}`}><span>{msg.time}</span>{msg.isMe && <CheckCheck className="w-3 h-3" />}</div>
-                    </div>
-                  )}
-                </div>
-              ))}
+              {messages.map((msg) => {
+                const isMe = msg.sender === userName;
+                return (
+                  <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                    {!isMe && <span className="text-[10px] font-semibold mb-1 ml-1 opacity-70">{msg.sender}</span>}
+                    {msg.type === 'poke' ? (
+                      <div className="my-1 px-4 py-2 bg-amber-500/20 text-amber-400 rounded-full text-xs font-bold flex items-center gap-2 animate-pulse"><BellRing className="w-4 h-4" /> {msg.sender} envió un Zumbido ⚡</div>
+                    ) : (
+                      <div className={`max-w-[85%] md:max-w-md rounded-2xl p-3.5 ${isMe ? 'bg-blue-600 text-white rounded-br-none' : darkMode ? 'bg-slate-900 text-slate-100 rounded-bl-none' : 'bg-white text-slate-800 rounded-bl-none'}`}>
+                        <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                        <div className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${isMe ? 'text-blue-100' : 'opacity-60'}`}><span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>{isMe && <CheckCheck className="w-3 h-3" />}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
 

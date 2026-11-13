@@ -3,8 +3,8 @@
   'use strict';
 
   // ⚠️ REEMPLAZA ESTO CON TUS CREDENCIALES DE SUPABASE (Project Settings > API)
-  var SUPABASE_URL = 'TU_SUPABASE_URL_AQUI';
-  var SUPABASE_KEY = 'TU_SUPABASE_ANON_KEY_AQUI';
+  var SUPABASE_URL = 'https://fedzgvgobjeokxfhvmok.supabase.co';
+  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlZHpndmdvYmplb2t4Zmh2bW9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1MzE4OTksImV4cCI6MjExMDEwNzg5OX0.tnxHWDOWQySJ8VDIQhYX5hmVHGvJCD7UlMrw7XeI2ZY';
 
   // Inicializamos Supabase
   var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
