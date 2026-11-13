@@ -1,3 +1,7 @@
+window.onerror = function(msg, url, line, col, error) {
+  alert("Error en iPad: " + msg + "\nLínea: " + line);
+  return false;
+};
 /* Nefa Chat - iPad App conectada a Supabase Realtime (ES5) */
 (function () {
   'use strict';
