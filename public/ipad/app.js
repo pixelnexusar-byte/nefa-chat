@@ -1,33 +1,23 @@
+/* Nefa Chat - iPad App conectada a Supabase Realtime (ES5) */
 (function () {
   'use strict';
 
-  // Datos iniciales basados en tu page.tsx
+  // ⚠️ REEMPLAZA ESTO CON TUS CREDENCIALES DE SUPABASE (Project Settings > API)
+  var SUPABASE_URL = 'TU_SUPABASE_URL_AQUI';
+  var SUPABASE_KEY = 'TU_SUPABASE_ANON_KEY_AQUI';
+
+  // Inicializamos Supabase
+  var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
   var state = {
-    user: 'Franco Sierralta',
+    user: '',
     activeTab: 'channels',
-    currentChatId: 'gen-1',
-    channels: [
-      { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo', unread: 0 },
-      { id: 'gen-2', name: 'logistica-china', description: 'Embarques, contenedores y courier', unread: 2 },
-      { id: 'gen-3', name: 'soporte-it', description: 'Sistemas y automatizaciones', unread: 1 }
-    ],
+    currentChatId: null,
+    channels: [],
     members: [
-      { id: 'usr-1', name: 'Ariel Diaz', role: 'Co-Founder / Cotizaciones' },
-      { id: 'usr-2', name: 'Melany', role: 'Atención y Promociones' },
-      { id: 'usr-3', name: 'Matias', role: 'Ventas y Operaciones' }
-    ],
-    messages: {
-      'gen-1': [
-        { id: 1, sender: 'Ariel Diaz', text: 'Buenos días equipo. ¿Cómo venimos con las cotizaciones?', type: 'text', isMe: false },
-        { id: 2, sender: 'Franco Sierralta', text: 'Todo en orden por acá. Actualizando valores.', type: 'text', isMe: true }
-      ],
-      'gen-2': [
-        { id: 1, sender: 'Franco Sierralta', text: 'Shipping mark: 船標 DE CHINA AL MUNDO', type: 'text', isMe: true }
-      ],
-      'usr-1': [
-        { id: 1, sender: 'Ariel Diaz', text: 'Franco, ¿revisaste la API de WhatsApp?', type: 'text', isMe: false }
-      ]
-    }
+      { id: 'usr-1', name: 'Ariel Diaz', role: 'Co-Founder' },
+      { id: 'usr-2', name: 'Melany', role: 'Atención' }
+    ]
   };
 
   var ui = {};
@@ -38,56 +28,115 @@
   });
 
   function show(node, yes) { node.className = node.className.replace(/\s*hidden\b/g, '') + (yes ? '' : ' hidden'); }
+
+  // --- CONSULTAS A SUPABASE ---
   
-  // Renderiza la lista de Canales o DMs en el sidebar
+  // 1. Traer Canales
+  function loadChannels(callback) {
+    supabase.from('channels').select('*').order('id').then(function(res) {
+      if (res.data) {
+        state.channels = res.data;
+        if (!state.currentChatId && state.channels.length > 0) {
+          state.currentChatId = state.channels[0].id;
+        }
+        if (callback) callback();
+      }
+    });
+  }
+
+  // 2. Traer Mensajes de un Canal
+  function loadMessages() {
+    if (!state.currentChatId || state.activeTab !== 'channels') return;
+    
+    supabase.from('messages')
+      .select('*')
+      .eq('channel_id', state.currentChatId)
+      .order('created_at', { ascending: true })
+      .then(function(res) {
+        if (res.data) renderMessages(res.data);
+      });
+  }
+
+  // 3. Enviar Mensaje
+  function sendMessage(text, type) {
+    var channelId = state.currentChatId;
+    if (!channelId) { alert('Selecciona un canal válido'); return; }
+
+    supabase.from('messages').insert([{
+      channel_id: channelId,
+      sender: state.user,
+      text: text,
+      type: type || 'text'
+    }]).then(function(res) {
+      if (res.error) alert('Error al enviar: ' + res.error.message);
+    });
+  }
+
+  // --- TIEMPO REAL (WEBSOCKETS) ---
+  function setupRealtime() {
+    supabase.channel('custom-all-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, function(payload) {
+        // Si llega un mensaje nuevo al canal actual, lo agregamos
+        if (payload.new.channel_id === state.currentChatId) {
+          loadMessages(); 
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'channels' }, function(payload) {
+        // Si alguien crea un canal, recargamos la lista
+        loadChannels(renderSidebar);
+      })
+      .subscribe();
+  }
+
+  // --- RENDERIZADO ---
   function renderSidebar() {
     ui['sidebar-list'].innerHTML = '';
     var list = state.activeTab === 'channels' ? state.channels : state.members;
     
     list.forEach(function(item) {
       var div = document.createElement('div');
-      div.className = 'list-item' + (state.currentChatId === item.id ? ' active' : '');
-      
+      div.className = 'list-item' + (String(state.currentChatId) === String(item.id) ? ' active' : '');
       var icon = state.activeTab === 'channels' ? '# ' : '';
       div.textContent = icon + (item.name);
       
       div.onclick = function() {
         state.currentChatId = item.id;
         renderSidebar();
-        renderChat();
+        updateChatHeader();
+        loadMessages();
       };
       ui['sidebar-list'].appendChild(div);
     });
   }
 
-  // Renderiza el área central de chat
-  function renderChat() {
+  function updateChatHeader() {
     var isChannel = state.activeTab === 'channels';
-    var current = isChannel ? state.channels.find(function(c) { return c.id === state.currentChatId; }) 
-                            : state.members.find(function(m) { return m.id === state.currentChatId; });
-    
+    var current = isChannel ? state.channels.find(function(c) { return String(c.id) === String(state.currentChatId); }) 
+                            : state.members.find(function(m) { return String(m.id) === String(state.currentChatId); });
     if (!current) return;
 
     ui['chat-name'].textContent = (isChannel ? '# ' : '') + current.name;
-    ui['chat-desc'].textContent = isChannel ? current.description : current.role;
+    ui['chat-desc'].textContent = isChannel ? (current.description || '') : current.role;
+  }
 
+  function renderMessages(msgs) {
     var container = ui['messages-container'];
+    var isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
     container.innerHTML = '';
-
-    var msgs = state.messages[state.currentChatId] || [];
     
     msgs.forEach(function(m) {
+      var isMe = (m.sender === state.user);
       var wrapper = document.createElement('div');
-      wrapper.className = 'message' + (m.isMe ? ' is-me' : '');
+      wrapper.className = 'message' + (isMe ? ' is-me' : '');
 
       if (m.type === 'poke') {
-        wrapper.className = ''; // El zumbido va centrado
+        wrapper.className = '';
         var poke = document.createElement('div');
         poke.className = 'poke-message';
         poke.innerHTML = '🔔 ' + m.sender + ' envió un Zumbido ⚡';
         wrapper.appendChild(poke);
       } else {
-        if (!m.isMe) {
+        if (!isMe) {
           var sender = document.createElement('span');
           sender.className = 'message-sender';
           sender.textContent = m.sender;
@@ -101,51 +150,10 @@
       container.appendChild(wrapper);
     });
 
-    // Auto-scroll al final
-    container.scrollTop = container.scrollHeight;
-  }
-
-  // Enviar Mensaje
-  function sendMessage() {
-    var text = ui['chat-input'].value.trim();
-    if (!text) return;
-
-    if (!state.messages[state.currentChatId]) state.messages[state.currentChatId] = [];
-    
-    state.messages[state.currentChatId].push({
-      id: Date.now(),
-      sender: state.user,
-      text: text,
-      type: 'text',
-      isMe: true
-    });
-
-    ui['chat-input'].value = '';
-    renderChat();
-  }
-
-  // Lógica del Zumbido
-  function triggerPoke() {
-    var app = document.getElementById('app');
-    app.classList.add('shake-active');
-    setTimeout(function() { app.classList.remove('shake-active'); }, 600);
-
-    if (!state.messages[state.currentChatId]) state.messages[state.currentChatId] = [];
-    
-    state.messages[state.currentChatId].push({
-      id: Date.now(),
-      sender: state.user,
-      text: '⚡ ¡ENVIÓ UN ZUMBIDO!',
-      type: 'poke',
-      isMe: true
-    });
-
-    renderChat();
+    if (isAtBottom) container.scrollTop = container.scrollHeight;
   }
 
   // --- EVENTOS ---
-
-  // Login
   ui['login-form'].onsubmit = function(e) {
     e.preventDefault();
     var name = ui.username.value.trim();
@@ -153,47 +161,53 @@
     
     state.user = name;
     localStorage.setItem('nefa_user', name);
-    
     ui['user-display-name'].textContent = name;
     ui['user-initials'].textContent = name.substring(0, 2).toUpperCase();
     
     show(ui.login, false);
     show(ui.app, true);
-    renderSidebar();
-    renderChat();
+    
+    loadChannels(function() {
+      renderSidebar();
+      updateChatHeader();
+      loadMessages();
+      setupRealtime(); // Activa WebSockets
+    });
   };
 
-  // Logout
   ui['logout-btn'].onclick = function() {
     localStorage.removeItem('nefa_user');
     window.location.reload();
   };
 
-  // Cambio de Pestañas
   ui['tab-channels'].onclick = function() {
     state.activeTab = 'channels';
-    state.currentChatId = state.channels[0].id;
+    state.currentChatId = state.channels.length > 0 ? state.channels[0].id : null;
     ui['tab-channels'].classList.add('active');
     ui['tab-dms'].classList.remove('active');
     renderSidebar();
-    renderChat();
+    updateChatHeader();
+    loadMessages();
   };
 
-  ui['tab-dms'].onclick = function() {
-    state.activeTab = 'dms';
-    state.currentChatId = state.members[0].id;
-    ui['tab-dms'].classList.add('active');
-    ui['tab-channels'].classList.remove('active');
-    renderSidebar();
-    renderChat();
+  ui['send-btn'].onclick = function() {
+    var text = ui['chat-input'].value.trim();
+    if (text) {
+      ui['chat-input'].value = '';
+      sendMessage(text, 'text');
+    }
   };
 
-  // Botones de Chat
-  ui['send-btn'].onclick = sendMessage;
   ui['chat-input'].onkeypress = function(e) {
-    if (e.key === 'Enter') sendMessage();
+    if (e.key === 'Enter') ui['send-btn'].click();
   };
-  ui['poke-btn'].onclick = triggerPoke;
+
+  ui['poke-btn'].onclick = function() {
+    var app = document.getElementById('app');
+    app.classList.add('shake-active');
+    setTimeout(function() { app.classList.remove('shake-active'); }, 600);
+    sendMessage('⚡ ¡ENVIÓ UN ZUMBIDO!', 'poke');
+  };
 
   // --- INICIALIZACIÓN ---
   var savedUser = localStorage.getItem('nefa_user');
@@ -203,8 +217,13 @@
     ui['user-initials'].textContent = savedUser.substring(0, 2).toUpperCase();
     show(ui.login, false);
     show(ui.app, true);
-    renderSidebar();
-    renderChat();
+    
+    loadChannels(function() {
+      renderSidebar();
+      updateChatHeader();
+      loadMessages();
+      setupRealtime();
+    });
   } else {
     show(ui.login, true);
     show(ui.app, false);
