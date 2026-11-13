@@ -24,7 +24,6 @@ interface Channel {
   description: string;
 }
 
-// Cliente REST liviano y directo: no congela jamás el inicio de React 19 / Next 16
 async function sbFetch(path: string, method: string = 'GET', body?: unknown) {
   const headers: Record<string, string> = {
     apikey: SUPABASE_KEY,
@@ -111,6 +110,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && /OS [789]_/.test(navigator.userAgent)) {
+      window.location.replace('/ipad/index.html');
+      return;
+    }
+
     try {
       const savedName = localStorage.getItem('nefa_username');
       if (savedName && savedName.trim()) {
@@ -365,8 +369,8 @@ export default function App() {
           </form>
 
           <div className="pt-2 border-t border-slate-800 text-center">
-            <a href="/ipad/index.html" className="text-[11px] text-blue-400 hover:underline font-medium">
-              ¿No responde o estás en iPad 2? Entrar a la versión ligera →
+            <a href="/ipad/index.html" className="text-[11px] text-slate-400 hover:text-blue-400 underline">
+              Versión ligera para iPad 2 (iOS 9) →
             </a>
           </div>
         </div>
