@@ -7,32 +7,28 @@ import {
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
-// Inicializar cliente de Supabase con tus variables del .env.local
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface Message {
-  id: number;
+  id: string;
   channel_id: string;
   sender: string;
   text?: string;
   time: string;
-  type: 'text' | 'code' | 'file' | 'image' | 'poke';
-  is_me?: boolean;
+  type: string;
 }
 
 interface Channel {
   id: string;
   name: string;
   description: string;
-  unread: number;
 }
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>('Franco Sierralta');
-
   const [darkMode, setDarkMode] = useState<boolean>(true);
   const [currentChatId, setCurrentChatId] = useState<string>('gen-1');
   const [inputText, setInputText] = useState<string>('');
@@ -43,16 +39,16 @@ export default function App() {
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
   const [callTimer, setCallTimer] = useState<number>(0);
 
-  const [channels, setChannels] = useState<Channel[]>([
-    { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo', unread: 0 },
-    { id: 'gen-2', name: 'logistica-china', description: 'Embarques, contenedores y courier', unread: 0 },
-    { id: 'gen-3', name: 'soporte-it', description: 'Sistemas y automatizaciones', unread: 0 },
-  ]);
+  const channels: Channel[] = [
+    { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo' },
+    { id: 'gen-2', name: 'logistica-china', description: 'Embarques, contenedores y courier' },
+    { id: 'gen-3', name: 'soporte-it', description: 'Sistemas y automatizaciones' },
+  ];
 
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Cargar mensajes desde Supabase al cambiar de canal o iniciar sesión
+  // Cargar mensajes y escuchar Supabase Realtime
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -60,31 +56,31 @@ export default function App() {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('channel_id', currentChatId)
-        .order('id', { ascending: true });
+        .eq('channel_id', currentChatId);
 
       if (data) {
         setMessages(data);
+      } else if (error) {
+        console.error('Error fetching messages:', error.message);
       }
     };
 
     fetchMessages();
 
-    // Suscripción en Tiempo Real (Realtime)
     const channelSubscription = supabase
-      .channel(`public:messages:channel_id=eq.${currentChatId}`)
+      .channel('realtime-messages')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
-        filter: `channel_id=eq.${currentChatId}`
       }, (payload) => {
         const newMessage = payload.new as Message;
-        setMessages((prev) => {
-          // Evitar duplicados si ya fue agregado localmente
-          if (prev.some(m => m.id === newMessage.id)) return prev;
-          return [...prev, newMessage];
-        });
+        if (newMessage.channel_id === currentChatId) {
+          setMessages((prev) => {
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            return [...prev, newMessage];
+          });
+        }
       })
       .subscribe();
 
@@ -97,7 +93,6 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Cronógrafo de llamadas
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isInCall) {
@@ -118,8 +113,8 @@ export default function App() {
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), 600);
 
-    const newMessage: Message = {
-      id: Date.now(),
+    const newMessage = {
+      id: Math.random().toString(36.25, 9),
       channel_id: currentChatId,
       sender: userName,
       text: '⚡ ¡ENVIÓ UN ZUMBIDO!',
@@ -127,16 +122,15 @@ export default function App() {
       type: 'poke'
     };
 
-    // Guardar en Supabase para que le llegue a todos
     await supabase.from('messages').insert([newMessage]);
   };
 
-  const handleSendMessage = async (customType: 'text' | 'code' | 'file' | 'image' | 'poke' = 'text', textContent?: string) => {
+  const handleSendMessage = async (customType: string = 'text', textContent?: string) => {
     const content = textContent || inputText;
     if (!content.trim() && customType === 'text') return;
 
-    const newMessage: Message = {
-      id: Date.now(),
+    const newMessage = {
+      id: Math.random().toString(36).substring(2, 9),
       channel_id: currentChatId,
       sender: userName,
       text: content,
@@ -144,14 +138,11 @@ export default function App() {
       type: customType
     };
 
-    // Actualización optimista local
-    setMessages(prev => [...prev, newMessage]);
     setInputText('');
 
-    // Guardar en Supabase Database
     const { error } = await supabase.from('messages').insert([newMessage]);
     if (error) {
-      console.error('Error al enviar mensaje a Supabase:', error.message);
+      console.error('Error al enviar mensaje:', error.message);
     }
   };
 
@@ -200,22 +191,8 @@ export default function App() {
   }
 
   return (
-    <div className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} h-screen w-screen flex flex-col overflow-hidden font-sans select-none touch-pan-y ${isShaking ? 'animate-bounce' : ''}`}>
+    <div className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} h-screen w-screen flex flex-col overflow-hidden font-sans select-none`}>
       
-      <style jsx global>{`
-        @keyframes shake {
-          0% { transform: translate(1px, 1px) rotate(0deg); }
-          20% { transform: translate(-3px, 0px) rotate(1deg); }
-          40% { transform: translate(1px, -1px) rotate(1deg); }
-          60% { transform: translate(-3px, 1px) rotate(0deg); }
-          80% { transform: translate(-1px, -1px) rotate(1deg); }
-          100% { transform: translate(1px, -2px) rotate(-1deg); }
-        }
-        .animate-bounce {
-          animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-        }
-      `}</style>
-
       {/* BARRA SUPERIOR */}
       <div className={`h-11 px-4 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between text-xs z-20 shrink-0`}>
         <div className="flex items-center gap-2">
@@ -344,7 +321,7 @@ export default function App() {
                     {!isMe && <span className="text-[10px] font-semibold mb-1 ml-1 opacity-70">{msg.sender}</span>}
                     
                     {msg.type === 'poke' ? (
-                      <div className="my-1 px-4 py-2 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-full text-xs font-bold flex items-center gap-2 animate-pulse">
+                      <div className="my-1 px-4 py-2 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-full text-xs font-bold flex items-center gap-2">
                         <BellRing className="w-4 h-4" /> {msg.sender} envió un Zumbido ⚡
                       </div>
                     ) : (
