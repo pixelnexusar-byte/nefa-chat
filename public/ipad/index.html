@@ -5,85 +5,84 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="NEFA Internal">
-  <title>NEFA Internal Workspace · iPad</title>
+  <meta name="apple-mobile-web-app-title" content="NEFA Software">
+  <title>NEFA Software · iPad</title>
   <link rel="apple-touch-icon" href="/ipad/icon.png">
   <link rel="icon" type="image/png" href="/ipad/icon.png">
   <link rel="stylesheet" href="/ipad/app.css">
 </head>
 <body>
+  <!-- BANNER DE ERROR VISIBLE -->
+  <div id="error-banner" class="error-banner hidden"></div>
+
   <!-- LOGIN -->
   <section id="login" class="login-screen">
     <div class="login-card">
-      <div class="logo-icon">⚡</div>
-      <h1>NEFA Internal Workspace</h1>
-      <p class="subtitle">Ingresa tu nombre para acceder al canal de comunicación del equipo</p>
+      <div class="logo-icon">N</div>
+      <h1>NEFA Software</h1>
+      <p class="subtitle">Ingresa tu nombre para conectar con el equipo en vivo</p>
       <form id="login-form">
-        <label>Tu Nombre o Perfil:</label>
-        <input id="username" type="text" placeholder="Ej. Franco Sierralta" value="Franco Sierralta" required>
+        <label>Tu Nombre:</label>
+        <input id="username" type="text" placeholder="Ej. Franco, Ariel, Melany..." value="Franco Sierralta" required>
         <button type="submit" class="btn-primary">Ingresar al Chat →</button>
       </form>
     </div>
   </section>
 
-  <!-- APP PRINCIPAL (SLACK STYLE) -->
+  <!-- APP PRINCIPAL -->
   <div id="app" class="app hidden">
     <!-- SIDEBAR -->
-    <aside class="sidebar">
+    <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
         <div class="workspace-info">
           <div class="workspace-icon">N</div>
-          <div>
-            <h2>NEFA Internal</h2>
-            <p>Canales de Equipo</p>
+          <div class="workspace-text">
+            <h2>NEFA Software</h2>
+            <p>Canales en Vivo</p>
           </div>
         </div>
+        <button id="close-sidebar-btn" class="btn-mobile-close" type="button">✕</button>
       </div>
 
-      <div class="tabs">
-        <button id="tab-channels" class="tab active"># Canales</button>
-        <button id="tab-dms" class="tab">👥 Directos</button>
+      <div class="channels-bar">
+        <span>CANALES</span>
+        <button id="new-channel-btn" class="btn-new-ch" type="button">+ Nuevo</button>
       </div>
 
-      <div class="sidebar-list" id="sidebar-list">
-        <!-- Se llena con JS -->
-      </div>
+      <div class="sidebar-list" id="sidebar-list"></div>
 
       <div class="sidebar-footer">
         <div class="user-info">
           <div class="avatar-small" id="user-initials">FS</div>
-          <div>
-            <p id="user-display-name">Franco Sierralta</p>
-            <p class="status-online">Sesión Activa</p>
+          <div class="user-meta">
+            <p id="user-display-name">Franco</p>
+            <p class="status-online">● En línea</p>
           </div>
         </div>
-        <button id="logout-btn" class="btn-logout">Salir</button>
+        <button id="logout-btn" class="btn-logout" type="button">Cambiar</button>
       </div>
     </aside>
 
     <!-- ÁREA DE CHAT -->
     <main class="chat-area">
       <header class="chat-header">
+        <button id="menu-btn" class="btn-menu" type="button">☰</button>
         <div class="chat-title">
           <h2 id="chat-name"># general</h2>
           <p id="chat-desc">Coordinación general del equipo</p>
         </div>
       </header>
 
-      <div class="messages-container" id="messages-container">
-        <!-- Se llena con JS -->
-      </div>
+      <div class="messages-container" id="messages-container"></div>
 
       <div class="chat-input-area">
-        <button id="poke-btn" class="btn-poke" title="Enviar Zumbido">🔔</button>
+        <button id="poke-btn" class="btn-poke" type="button" title="Enviar Zumbido MSN">🔔</button>
         <input id="chat-input" type="text" placeholder="Escribe un mensaje..." autocomplete="off">
-        <button id="send-btn" class="btn-send">Enviar</button>
+        <button id="send-btn" class="btn-send" type="button">Enviar</button>
       </div>
     </main>
   </div>
-<!-- Importamos Supabase (versión compatible con navegadores viejos) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@1"></script>
-<script src="/ipad/app.js"></script>
 
+  <script src="/ipad/app.js"></script>
 </body>
 </html>
