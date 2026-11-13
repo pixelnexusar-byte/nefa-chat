@@ -30,11 +30,8 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>('');
   const [darkMode, setDarkMode] = useState<boolean>(true);
-  
-  // Control de menú lateral en celular
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
-  // Estados de Canales y edición
   const [channels, setChannels] = useState<Channel[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string>('gen-1');
   const [isAddingChannel, setIsAddingChannel] = useState<boolean>(false);
@@ -44,20 +41,51 @@ export default function App() {
   const [editChannelName, setEditChannelName] = useState<string>('');
   const [editChannelDesc, setEditChannelDesc] = useState<string>('');
 
-  // Estados de Mensajes y alertas
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState<string>('');
   const [dbError, setDbError] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState<boolean>(false);
 
-  // Estados de llamada
   const [isInCall, setIsInCall] = useState<boolean>(false);
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
   const [callTimer, setCallTimer] = useState<number>(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastProcessedMsgId = useRef<string | null>(null);
 
-  // Recuperar nombre guardado en el navegador para no tipearlo siempre
+  // Función que ejecuta el combo clásico de MSN: Sacudida + Sonido + Vibración
+  const playMsnNudgeEffect = () => {
+    setIsShaking(false);
+    setTimeout(() => setIsShaking(true), 10);
+    setTimeout(() => setIsShaking(false), 900);
+
+    // Vibración física en celulares compatibles
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate([120, 40, 120, 40, 180, 40, 250]);
+    }
+
+    // Sonido clásico sintetizado (no requiere archivos mp3 externos)
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const times = [0, 0.08, 0.16, 0.24, 0.32, 0.40, 0.48, 0.56];
+      times.forEach((t, index) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(index % 2 === 0 ? 340 : 460, ctx.currentTime + t);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime + t);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + t + 0.07);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + t);
+        osc.stop(ctx.currentTime + t + 0.07);
+      });
+    } catch {
+      // Ignorar si el navegador bloquea el audio sin interacción previa
+    }
+  };
+
   useEffect(() => {
     const savedName = localStorage.getItem('nefa_username');
     if (savedName) {
@@ -77,7 +105,7 @@ export default function App() {
     setIsLoggedIn(false);
   };
 
-  // 1. Cargar Canales y escuchar cambios de canales en vivo
+  // 1. Cargar Canales y escuchar cambios
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -115,7 +143,7 @@ export default function App() {
   useEffect(() => {
     if (!isLoggedIn || !currentChatId) return;
 
-    const fetchMessages = async () => {
+    const fetchMessages = async (isInitial = false) => {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -126,14 +154,23 @@ export default function App() {
         setDbError(`Error al leer mensajes: ${error.message}`);
       } else if (data) {
         setDbError(null);
+        if (data.length > 0) {
+          const latest = data[data.length - 1];
+          // Si llegó un zumbido nuevo por polling que aún no sacudió la pantalla
+          if (!isInitial && lastProcessedMsgId.current && lastProcessedMsgId.current !== latest.id) {
+            if (latest.type === 'poke' && latest.sender.toLowerCase() !== userName.toLowerCase()) {
+              playMsnNudgeEffect();
+            }
+          }
+          lastProcessedMsgId.current = latest.id;
+        }
         setMessages(data);
       }
     };
 
-    fetchMessages();
+    fetchMessages(true);
 
-    // Intervalo de respaldo cada 3s + Realtime instantáneo
-    const pollInterval = setInterval(fetchMessages, 3000);
+    const pollInterval = setInterval(() => fetchMessages(false), 2500);
 
     const msgSub = supabase
       .channel(`room-${currentChatId}`)
@@ -144,10 +181,10 @@ export default function App() {
       }, (payload) => {
         const incoming = payload.new as Message;
         if (incoming.channel_id === currentChatId) {
-          if (incoming.type === 'poke' && incoming.sender !== userName) {
-            setIsShaking(true);
-            setTimeout(() => setIsShaking(false), 700);
+          if (incoming.type === 'poke' && incoming.sender.toLowerCase() !== userName.toLowerCase() && lastProcessedMsgId.current !== incoming.id) {
+            playMsnNudgeEffect();
           }
+          lastProcessedMsgId.current = incoming.id;
           setMessages((prev) => {
             if (prev.some(m => m.id === incoming.id)) return prev;
             return [...prev, incoming];
@@ -176,7 +213,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isInCall]);
 
-  // Funciones para Crear, Editar y Borrar Canales
   const handleCreateChannel = async () => {
     if (!newChannelName.trim()) return;
     const cleanName = newChannelName.trim().toLowerCase().replace(/\s+/g, '-');
@@ -243,18 +279,18 @@ export default function App() {
   };
 
   const triggerPoke = async () => {
-    setIsShaking(true);
-    setTimeout(() => setIsShaking(false), 700);
+    playMsnNudgeEffect();
 
     const newMessage: Message = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       channel_id: currentChatId,
       sender: userName,
-      text: '⚡ ¡ENVIÓ UN ZUMBIDO!',
+      text: '⚡ ¡Acaba de enviar un Zumbido!',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       type: 'poke'
     };
 
+    lastProcessedMsgId.current = newMessage.id;
     setMessages(prev => [...prev, newMessage]);
     const { error } = await supabase.from('messages').insert([newMessage]);
     if (error) setDbError(`Error al enviar zumbido: ${error.message}`);
@@ -273,6 +309,7 @@ export default function App() {
       type: customType
     };
 
+    lastProcessedMsgId.current = newMessage.id;
     setMessages(prev => [...prev, newMessage]);
     setInputText('');
 
@@ -330,8 +367,38 @@ export default function App() {
   }
 
   return (
-    <div className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} h-[100dvh] w-screen flex flex-col overflow-hidden font-sans ${isShaking ? 'animate-bounce' : ''}`}>
+    <div className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} h-[100dvh] w-screen flex flex-col overflow-hidden font-sans ${isShaking ? 'msn-buzz-active' : ''}`}>
       
+      {/* ANIMACIÓN AUTÉNTICA DE ZUMBIDO MSN MESSENGER */}
+      <style>{`
+        @keyframes msn-nudge {
+          0% { transform: translate(0, 0) rotate(0deg); }
+          5% { transform: translate(-16px, -12px) rotate(-2.5deg); }
+          10% { transform: translate(16px, 10px) rotate(2.5deg); }
+          15% { transform: translate(-18px, 12px) rotate(-2deg); }
+          20% { transform: translate(18px, -12px) rotate(2deg); }
+          25% { transform: translate(-16px, -10px) rotate(-2.5deg); }
+          30% { transform: translate(16px, 14px) rotate(2.5deg); }
+          35% { transform: translate(-14px, 10px) rotate(-1.5deg); }
+          40% { transform: translate(14px, -14px) rotate(1.5deg); }
+          45% { transform: translate(-16px, -8px) rotate(-2deg); }
+          50% { transform: translate(16px, 12px) rotate(2deg); }
+          55% { transform: translate(-12px, 10px) rotate(-1.5deg); }
+          60% { transform: translate(12px, -10px) rotate(1.5deg); }
+          65% { transform: translate(-10px, -8px) rotate(-1deg); }
+          70% { transform: translate(10px, 8px) rotate(1deg); }
+          75% { transform: translate(-8px, 6px) rotate(-1deg); }
+          80% { transform: translate(8px, -6px) rotate(1deg); }
+          85% { transform: translate(-6px, -4px) rotate(-0.5deg); }
+          90% { transform: translate(6px, 4px) rotate(0.5deg); }
+          95% { transform: translate(-4px, 2px) rotate(0deg); }
+          100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        .msn-buzz-active {
+          animation: msn-nudge 0.85s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+        }
+      `}</style>
+
       {/* BANNER DE ERROR SI SUPABASE BLOQUEA ALGO */}
       {dbError && (
         <div className="bg-red-600 text-white px-4 py-2 text-xs flex items-center justify-between z-50 shrink-0">
@@ -346,7 +413,6 @@ export default function App() {
       {/* CONTENEDOR PRINCIPAL ADAPTADO A CELULAR Y PC */}
       <div className="flex-1 flex h-full w-full relative overflow-hidden">
 
-        {/* FONDO OSCURO EN CELULAR CUANDO SE ABRE EL MENÚ */}
         {sidebarOpen && (
           <div 
             className="fixed inset-0 bg-black/60 z-30 md:hidden" 
@@ -354,12 +420,11 @@ export default function App() {
           />
         )}
 
-        {/* SIDEBAR DE CANALES (Oculto en celular, fijo en PC/Tablet horizontal) */}
+        {/* SIDEBAR DE CANALES */}
         <div className={`fixed md:static inset-y-0 left-0 z-40 w-72 sm:w-80 flex flex-col border-r transition-transform duration-200 ease-in-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         } ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
           
-          {/* Header Sidebar */}
           <div className={`p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex items-center justify-between`}>
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold shadow">
@@ -387,7 +452,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Listado de Canales con botón para Crear y Editar */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
             <div className="flex items-center justify-between px-2 mb-2">
               <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Canales</span>
@@ -399,7 +463,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* Formulario para agregar canal */}
             {isAddingChannel && (
               <div className={`p-3 rounded-xl border mb-3 space-y-2 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-300'}`}>
                 <input
@@ -490,7 +553,6 @@ export default function App() {
             ))}
           </div>
 
-          {/* Footer Usuario */}
           <div className={`p-3 border-t ${darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'} flex items-center justify-between`}>
             <div className="flex items-center gap-2.5 truncate">
               <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
@@ -510,10 +572,9 @@ export default function App() {
           </div>
         </div>
 
-        {/* ÁREA DE CHAT PRINCIPAL (100% ancho en celular) */}
+        {/* ÁREA DE CHAT PRINCIPAL */}
         <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
           
-          {/* Cabecera del Canal con botón hamburguesa para celular */}
           <div className={`h-14 sm:h-16 px-3 sm:px-6 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0`}>
             <div className="flex items-center gap-2.5 truncate">
               <button 
@@ -564,8 +625,9 @@ export default function App() {
                     {!isMe && <span className="text-[11px] font-bold mb-1 ml-1 text-blue-400">{msg.sender}</span>}
                     
                     {msg.type === 'poke' ? (
-                      <div className="my-1 px-4 py-2 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-full text-xs font-bold flex items-center gap-2">
-                        <BellRing className="w-4 h-4" /> {msg.sender} envió un Zumbido ⚡
+                      <div className="my-1.5 px-4 py-2 bg-amber-500/20 border-2 border-amber-500 text-amber-400 rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-amber-500/10">
+                        <BellRing className="w-4 h-4 animate-ping" />
+                        <span>¡{msg.sender} ha enviado un Zumbido! ⚡ ({msg.time})</span>
                       </div>
                     ) : (
                       <div className={`max-w-[85%] sm:max-w-md rounded-2xl px-3.5 py-2.5 shadow-sm ${
@@ -587,7 +649,7 @@ export default function App() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Barra de Entrada de Texto Adaptada a Celular */}
+          {/* Barra de Entrada */}
           <div className={`p-2.5 sm:p-4 border-t ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
             <div className="flex items-center gap-1.5 sm:gap-2">
               <label className={`p-2.5 sm:p-3 rounded-xl border cursor-pointer shrink-0 ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`}>
@@ -598,7 +660,7 @@ export default function App() {
               <button 
                 onClick={triggerPoke}
                 className="p-2.5 sm:p-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl shadow-md transition-transform active:scale-90 font-bold shrink-0"
-                title="Enviar Zumbido"
+                title="Enviar Zumbido MSN"
               >
                 <BellRing className="w-4 h-4" />
               </button>
