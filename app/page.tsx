@@ -1,9 +1,8 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  MessageSquare, Users, Hash, Send, Paperclip, 
-  Sun, Moon, Phone, Video, CheckCheck, 
-  Zap, Tablet, Monitor, ArrowRight, BellRing
+  Hash, Send, Paperclip, Sun, Moon, Phone, Video, CheckCheck, 
+  Zap, ArrowRight, BellRing, Menu, X, Plus, Edit2, Trash2, Check, AlertCircle
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -18,6 +17,7 @@ interface Message {
   text?: string;
   time: string;
   type: string;
+  created_at?: string;
 }
 
 interface Channel {
@@ -28,66 +28,139 @@ interface Channel {
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [userName, setUserName] = useState<string>('Franco Sierralta');
+  const [userName, setUserName] = useState<string>('');
   const [darkMode, setDarkMode] = useState<boolean>(true);
-  const [currentChatId, setCurrentChatId] = useState<string>('gen-1');
-  const [inputText, setInputText] = useState<string>('');
-  const [deviceMode, setDeviceMode] = useState<'responsive' | 'ipad'>('responsive');
   
+  // Control de menú lateral en celular
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+
+  // Estados de Canales y edición
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string>('gen-1');
+  const [isAddingChannel, setIsAddingChannel] = useState<boolean>(false);
+  const [newChannelName, setNewChannelName] = useState<string>('');
+  const [newChannelDesc, setNewChannelDesc] = useState<string>('');
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
+  const [editChannelName, setEditChannelName] = useState<string>('');
+  const [editChannelDesc, setEditChannelDesc] = useState<string>('');
+
+  // Estados de Mensajes y alertas
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState<string>('');
+  const [dbError, setDbError] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState<boolean>(false);
+
+  // Estados de llamada
   const [isInCall, setIsInCall] = useState<boolean>(false);
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
   const [callTimer, setCallTimer] = useState<number>(0);
 
-  const channels: Channel[] = [
-    { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo' },
-    { id: 'gen-2', name: 'logistica-china', description: 'Embarques, contenedores y courier' },
-    { id: 'gen-3', name: 'soporte-it', description: 'Sistemas y automatizaciones' },
-  ];
-
-  const [messages, setMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Cargar mensajes y escuchar Supabase Realtime
+  // Recuperar nombre guardado en el navegador para no tipearlo siempre
+  useEffect(() => {
+    const savedName = localStorage.getItem('nefa_username');
+    if (savedName) {
+      setUserName(savedName);
+      setIsLoggedIn(true);
+    }
+  }, []);
+
+  const handleLogin = () => {
+    if (!userName.trim()) return;
+    localStorage.setItem('nefa_username', userName.trim());
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('nefa_username');
+    setIsLoggedIn(false);
+  };
+
+  // 1. Cargar Canales y escuchar cambios de canales en vivo
   useEffect(() => {
     if (!isLoggedIn) return;
+
+    const fetchChannels = async () => {
+      const { data, error } = await supabase
+        .from('channels')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        setDbError(`Error de base de datos (Canales): ${error.message}`);
+      } else if (data) {
+        setChannels(data);
+        if (data.length > 0 && !data.some(c => c.id === currentChatId)) {
+          setCurrentChatId(data[0].id);
+        }
+      }
+    };
+
+    fetchChannels();
+
+    const chSub = supabase
+      .channel('public-channels')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, () => {
+        fetchChannels();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(chSub);
+    };
+  }, [isLoggedIn]);
+
+  // 2. Cargar Mensajes y escuchar nuevos mensajes + zumbidos en vivo
+  useEffect(() => {
+    if (!isLoggedIn || !currentChatId) return;
 
     const fetchMessages = async () => {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('channel_id', currentChatId);
+        .eq('channel_id', currentChatId)
+        .order('created_at', { ascending: true });
 
-      if (data) {
+      if (error) {
+        setDbError(`Error al leer mensajes: ${error.message}`);
+      } else if (data) {
+        setDbError(null);
         setMessages(data);
-      } else if (error) {
-        console.error('Error fetching messages:', error.message);
       }
     };
 
     fetchMessages();
 
-    const channelSubscription = supabase
-      .channel('realtime-messages')
+    // Intervalo de respaldo cada 3s + Realtime instantáneo
+    const pollInterval = setInterval(fetchMessages, 3000);
+
+    const msgSub = supabase
+      .channel(`room-${currentChatId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'messages',
+        table: 'messages'
       }, (payload) => {
-        const newMessage = payload.new as Message;
-        if (newMessage.channel_id === currentChatId) {
+        const incoming = payload.new as Message;
+        if (incoming.channel_id === currentChatId) {
+          if (incoming.type === 'poke' && incoming.sender !== userName) {
+            setIsShaking(true);
+            setTimeout(() => setIsShaking(false), 700);
+          }
           setMessages((prev) => {
-            if (prev.some(m => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
+            if (prev.some(m => m.id === incoming.id)) return prev;
+            return [...prev, incoming];
           });
         }
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channelSubscription);
+      clearInterval(pollInterval);
+      supabase.removeChannel(msgSub);
     };
-  }, [currentChatId, isLoggedIn]);
+  }, [currentChatId, isLoggedIn, userName]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -103,6 +176,66 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isInCall]);
 
+  // Funciones para Crear, Editar y Borrar Canales
+  const handleCreateChannel = async () => {
+    if (!newChannelName.trim()) return;
+    const cleanName = newChannelName.trim().toLowerCase().replace(/\s+/g, '-');
+    const newCh: Channel = {
+      id: `ch-${Date.now()}`,
+      name: cleanName,
+      description: newChannelDesc.trim() || 'Canal del equipo'
+    };
+
+    const { error } = await supabase.from('channels').insert([newCh]);
+    if (error) {
+      setDbError(`No se pudo crear el canal: ${error.message}`);
+    } else {
+      setChannels(prev => [...prev, newCh]);
+      setCurrentChatId(newCh.id);
+      setNewChannelName('');
+      setNewChannelDesc('');
+      setIsAddingChannel(false);
+      setSidebarOpen(false);
+    }
+  };
+
+  const startEditingChannel = (ch: Channel, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingChannelId(ch.id);
+    setEditChannelName(ch.name);
+    setEditChannelDesc(ch.description || '');
+  };
+
+  const handleSaveChannelEdit = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!editChannelName.trim()) return;
+    const cleanName = editChannelName.trim().toLowerCase().replace(/\s+/g, '-');
+
+    const { error } = await supabase
+      .from('channels')
+      .update({ name: cleanName, description: editChannelDesc.trim() })
+      .eq('id', id);
+
+    if (error) {
+      setDbError(`No se pudo editar el canal: ${error.message}`);
+    } else {
+      setChannels(prev => prev.map(c => c.id === id ? { ...c, name: cleanName, description: editChannelDesc.trim() } : c));
+      setEditingChannelId(null);
+    }
+  };
+
+  const handleDeleteChannel = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (channels.length <= 1) return;
+    const { error } = await supabase.from('channels').delete().eq('id', id);
+    if (!error) {
+      const remaining = channels.filter(c => c.id !== id);
+      setChannels(remaining);
+      if (currentChatId === id && remaining.length > 0) {
+        setCurrentChatId(remaining[0].id);
+      }
+    }
+  };
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
     const remainingSecs = secs % 60;
@@ -111,10 +244,10 @@ export default function App() {
 
   const triggerPoke = async () => {
     setIsShaking(true);
-    setTimeout(() => setIsShaking(false), 600);
+    setTimeout(() => setIsShaking(false), 700);
 
-    const newMessage = {
-      id: Math.random().toString(36.25, 9),
+    const newMessage: Message = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       channel_id: currentChatId,
       sender: userName,
       text: '⚡ ¡ENVIÓ UN ZUMBIDO!',
@@ -122,15 +255,17 @@ export default function App() {
       type: 'poke'
     };
 
-    await supabase.from('messages').insert([newMessage]);
+    setMessages(prev => [...prev, newMessage]);
+    const { error } = await supabase.from('messages').insert([newMessage]);
+    if (error) setDbError(`Error al enviar zumbido: ${error.message}`);
   };
 
   const handleSendMessage = async (customType: string = 'text', textContent?: string) => {
-    const content = textContent || inputText;
+    const content = textContent ?? inputText;
     if (!content.trim() && customType === 'text') return;
 
-    const newMessage = {
-      id: Math.random().toString(36).substring(2, 9),
+    const newMessage: Message = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       channel_id: currentChatId,
       sender: userName,
       text: content,
@@ -138,11 +273,14 @@ export default function App() {
       type: customType
     };
 
+    setMessages(prev => [...prev, newMessage]);
     setInputText('');
 
     const { error } = await supabase.from('messages').insert([newMessage]);
     if (error) {
-      console.error('Error al enviar mensaje:', error.message);
+      setDbError(`No se guardó el mensaje en Supabase: ${error.message}`);
+    } else {
+      setDbError(null);
     }
   };
 
@@ -152,38 +290,39 @@ export default function App() {
     handleSendMessage('file', `📁 Archivo adjunto: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
   };
 
+  const activeChannel = channels.find(c => c.id === currentChatId);
+
   if (!isLoggedIn) {
     return (
-      <div className="h-screen w-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 font-sans select-none">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl space-y-6">
+      <div className="h-[100dvh] w-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 font-sans">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
           <div className="flex flex-col items-center text-center space-y-2">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">
               <Zap className="w-7 h-7" />
             </div>
-            <h1 className="text-xl font-bold tracking-wide">NEFA Internal Workspace</h1>
-            <p className="text-xs text-slate-400">Ingresa tu nombre para acceder al historial en tiempo real</p>
+            <h1 className="text-xl font-bold tracking-wide">NEFA Software Chat</h1>
+            <p className="text-xs text-slate-400">Ingresa tu nombre para conectarte en vivo con el equipo</p>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Tu Nombre o Perfil:</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Tu Nombre:</label>
               <input 
                 type="text" 
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
-                placeholder="Ej. Franco Sierralta"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 outline-none focus:border-blue-500 transition-colors"
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                placeholder="Ej. Franco, Ariel, Melany..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 outline-none focus:border-blue-500"
               />
             </div>
 
-            <div className="pt-2">
-              <button 
-                onClick={() => { if(userName.trim()) setIsLoggedIn(true); }}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 transition-all active:scale-95"
-              >
-                Conectar al Chat <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+            <button 
+              onClick={handleLogin}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95"
+            >
+              Entrar al Chat <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
@@ -191,192 +330,296 @@ export default function App() {
   }
 
   return (
-    <div className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} h-screen w-screen flex flex-col overflow-hidden font-sans select-none`}>
+    <div className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} h-[100dvh] w-screen flex flex-col overflow-hidden font-sans ${isShaking ? 'animate-bounce' : ''}`}>
       
-      {/* BARRA SUPERIOR */}
-      <div className={`h-11 px-4 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between text-xs z-20 shrink-0`}>
-        <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4 text-blue-500" />
-          <span className="font-bold">NEFA Workspace</span>
-          <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-mono">En Línea: {userName}</span>
+      {/* BANNER DE ERROR SI SUPABASE BLOQUEA ALGO */}
+      {dbError && (
+        <div className="bg-red-600 text-white px-4 py-2 text-xs flex items-center justify-between z-50 shrink-0">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{dbError}</span>
+          </div>
+          <button onClick={() => setDbError(null)} className="underline ml-2">Cerrar</button>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] opacity-70 hidden sm:inline">Vista:</span>
-          <button 
-            onClick={() => setDeviceMode('responsive')}
-            className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors ${deviceMode === 'responsive' ? 'bg-blue-600 text-white' : 'opacity-70 hover:opacity-100'}`}
-          >
-            <Monitor className="w-3.5 h-3.5" /> Full
-          </button>
-          <button 
-            onClick={() => setDeviceMode('ipad')}
-            className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors ${deviceMode === 'ipad' ? 'bg-blue-600 text-white' : 'opacity-70 hover:opacity-100'}`}
-          >
-            <Tablet className="w-3.5 h-3.5" /> iPad 2 View
-          </button>
-        </div>
-      </div>
+      )}
 
-      {/* CONTENEDOR PRINCIPAL */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden p-0 sm:p-2 bg-black/20">
-        <div className={`flex h-full w-full transition-all duration-300 shadow-2xl overflow-hidden ${
-          deviceMode === 'ipad' 
-            ? 'max-w-[1024px] max-h-[768px] rounded-xl border-4 border-slate-700' 
-            : 'rounded-none border-0'
-        } ${darkMode ? 'bg-slate-950' : 'bg-white'}`}>
+      {/* CONTENEDOR PRINCIPAL ADAPTADO A CELULAR Y PC */}
+      <div className="flex-1 flex h-full w-full relative overflow-hidden">
 
-          {/* SIDEBAR */}
-          <div className={`w-72 sm:w-80 flex flex-col border-r ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} z-10 shrink-0`}>
-            <div className={`p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex items-center justify-between`}>
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold shadow">
-                  N
-                </div>
-                <div>
-                  <h1 className="font-bold text-xs">NEFA Internal</h1>
-                  <p className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Canales Compartidos</p>
-                </div>
+        {/* FONDO OSCURO EN CELULAR CUANDO SE ABRE EL MENÚ */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/60 z-30 md:hidden" 
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* SIDEBAR DE CANALES (Oculto en celular, fijo en PC/Tablet horizontal) */}
+        <div className={`fixed md:static inset-y-0 left-0 z-40 w-72 sm:w-80 flex flex-col border-r transition-transform duration-200 ease-in-out ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        } ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
+          
+          {/* Header Sidebar */}
+          <div className={`p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex items-center justify-between`}>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold shadow">
+                N
               </div>
-              
+              <div>
+                <h1 className="font-bold text-sm">NEFA Software</h1>
+                <p className="text-[10px] text-emerald-400">● En vivo ({userName})</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-1">
               <button 
                 onClick={() => setDarkMode(!darkMode)}
-                className={`p-2.5 rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-800 text-yellow-400' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
+                className={`p-2 rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-800 text-yellow-400' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
               >
                 {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
-            </div>
-
-            {/* Listado de Canales */}
-            <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
-              <p className="px-3 text-[10px] font-semibold tracking-wider text-slate-500 uppercase mb-2">Canales</p>
-              {channels.map(ch => (
-                <button
-                  key={ch.id}
-                  onClick={() => setCurrentChatId(ch.id)}
-                  className={`w-full text-left px-3 py-3 rounded-xl flex items-center justify-between transition-all ${currentChatId === ch.id ? (darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200') : (darkMode ? 'text-slate-300 hover:bg-slate-800/60' : 'text-slate-700 hover:bg-slate-100')}`}
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Hash className="w-4 h-4 opacity-70 shrink-0" />
-                    <span className="text-xs font-medium truncate">{ch.name}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {/* Footer Sesión */}
-            <div className={`p-3 border-t ${darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'} flex items-center justify-between`}>
-              <div className="flex items-center gap-2.5 truncate">
-                <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">
-                  {userName.substring(0, 2).toUpperCase()}
-                </div>
-                <div className="truncate">
-                  <p className="text-xs font-bold truncate">{userName}</p>
-                  <p className={`text-[9px] ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>Sincronizado</p>
-                </div>
-              </div>
               <button 
-                onClick={() => setIsLoggedIn(false)} 
-                className={`text-[10px] underline ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-black'}`}
+                onClick={() => setSidebarOpen(false)}
+                className="p-2 rounded-xl md:hidden text-slate-400 hover:text-white"
               >
-                Salir
+                <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          {/* ÁREA DE CHAT PRINCIPAL */}
-          <div className="flex-1 flex flex-col h-full relative overflow-hidden">
-            <div className={`h-16 px-4 sm:px-6 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0`}>
-              <div>
-                <h2 className="font-bold text-xs sm:text-sm">
-                  # {channels.find(c => c.id === currentChatId)?.name}
-                </h2>
-                <p className={`text-[10px] sm:text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {channels.find(c => c.id === currentChatId)?.description}
-                </p>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => { setIsInCall(true); setCallType('voice'); }} 
-                  className={`p-2.5 rounded-xl border ${darkMode ? 'border-slate-800 bg-slate-800/50 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
-                >
-                  <Phone className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => { setIsInCall(true); setCallType('video'); }} 
-                  className={`p-2.5 rounded-xl border ${darkMode ? 'border-slate-800 bg-slate-800/50 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
-                >
-                  <Video className="w-4 h-4" />
-                </button>
-              </div>
+          {/* Listado de Canales con botón para Crear y Editar */}
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
+            <div className="flex items-center justify-between px-2 mb-2">
+              <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Canales</span>
+              <button 
+                onClick={() => setIsAddingChannel(!isAddingChannel)}
+                className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded-lg flex items-center gap-1 font-medium"
+              >
+                <Plus className="w-3.5 h-3.5" /> Nuevo
+              </button>
             </div>
 
-            {/* Mensajes en tiempo real */}
-            <div className={`flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 ${darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
-              {messages.map((msg) => {
-                const isMe = msg.sender === userName;
+            {/* Formulario para agregar canal */}
+            {isAddingChannel && (
+              <div className={`p-3 rounded-xl border mb-3 space-y-2 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-300'}`}>
+                <input
+                  type="text"
+                  placeholder="Nombre del canal (ej. ventas)"
+                  value={newChannelName}
+                  onChange={(e) => setNewChannelName(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
+                />
+                <input
+                  type="text"
+                  placeholder="Descripción corta"
+                  value={newChannelDesc}
+                  onChange={(e) => setNewChannelDesc(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
+                />
+                <div className="flex justify-end gap-2 pt-1">
+                  <button onClick={() => setIsAddingChannel(false)} className="text-xs text-slate-400 px-2 py-1">Cancelar</button>
+                  <button onClick={handleCreateChannel} className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg font-semibold">Crear</button>
+                </div>
+              </div>
+            )}
+
+            {channels.map(ch => (
+              <div
+                key={ch.id}
+                onClick={() => { setCurrentChatId(ch.id); setSidebarOpen(false); }}
+                className={`group w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
+                  currentChatId === ch.id 
+                    ? (darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200') 
+                    : (darkMode ? 'text-slate-300 hover:bg-slate-800/60' : 'text-slate-700 hover:bg-slate-100')
+                }`}
+              >
+                {editingChannelId === ch.id ? (
+                  <div className="flex-1 space-y-1.5 mr-2" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="text"
+                      value={editChannelName}
+                      onChange={(e) => setEditChannelName(e.target.value)}
+                      className="w-full px-2 py-1 text-xs rounded bg-slate-950 border border-blue-500 text-white outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={editChannelDesc}
+                      onChange={(e) => setEditChannelDesc(e.target.value)}
+                      placeholder="Descripción"
+                      className="w-full px-2 py-1 text-[10px] rounded bg-slate-950 border border-slate-700 text-slate-300 outline-none"
+                    />
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={(e) => handleSaveChannelEdit(ch.id, e)} className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Guardar
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); setEditingChannelId(null); }} className="text-slate-400 text-[10px]">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2.5 truncate pr-2">
+                      <Hash className="w-4 h-4 opacity-70 shrink-0" />
+                      <div className="truncate">
+                        <p className="text-xs font-semibold truncate">{ch.name}</p>
+                        {ch.description && <p className="text-[10px] opacity-60 truncate">{ch.description}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-80 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button 
+                        onClick={(e) => startEditingChannel(ch, e)}
+                        className="p-1.5 hover:bg-slate-700/50 rounded-lg text-slate-400 hover:text-white"
+                        title="Editar canal"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      {channels.length > 1 && (
+                        <button 
+                          onClick={(e) => handleDeleteChannel(ch.id, e)}
+                          className="p-1.5 hover:bg-red-500/20 rounded-lg text-slate-400 hover:text-red-400"
+                          title="Eliminar canal"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Footer Usuario */}
+          <div className={`p-3 border-t ${darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'} flex items-center justify-between`}>
+            <div className="flex items-center gap-2.5 truncate">
+              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                {userName.substring(0, 2).toUpperCase()}
+              </div>
+              <div className="truncate">
+                <p className="text-xs font-bold truncate">{userName}</p>
+                <p className="text-[10px] text-emerald-400">Conectado</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleLogout} 
+              className="text-xs text-red-400 hover:underline px-2 py-1"
+            >
+              Cambiar
+            </button>
+          </div>
+        </div>
+
+        {/* ÁREA DE CHAT PRINCIPAL (100% ancho en celular) */}
+        <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
+          
+          {/* Cabecera del Canal con botón hamburguesa para celular */}
+          <div className={`h-14 sm:h-16 px-3 sm:px-6 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0`}>
+            <div className="flex items-center gap-2.5 truncate">
+              <button 
+                onClick={() => setSidebarOpen(true)}
+                className={`p-2 rounded-xl border md:hidden ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <div className="truncate">
+                <h2 className="font-bold text-sm sm:text-base truncate">
+                  # {activeChannel?.name || 'general'}
+                </h2>
+                <p className={`text-[10px] sm:text-xs truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {activeChannel?.description || 'Canal de comunicación en vivo'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button 
+                onClick={() => { setIsInCall(true); setCallType('voice'); }} 
+                className={`p-2.5 rounded-xl border ${darkMode ? 'border-slate-800 bg-slate-800/50 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
+              >
+                <Phone className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => { setIsInCall(true); setCallType('video'); }} 
+                className={`p-2.5 rounded-xl border ${darkMode ? 'border-slate-800 bg-slate-800/50 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
+              >
+                <Video className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de Mensajes */}
+          <div className={`flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 ${darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
+            {messages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center opacity-50 text-xs">
+                <Hash className="w-8 h-8 mb-2 stroke-1" />
+                <p>No hay mensajes en #{activeChannel?.name}.</p>
+                <p>¡Escribí el primero para iniciar la charla!</p>
+              </div>
+            ) : (
+              messages.map((msg) => {
+                const isMe = msg.sender.toLowerCase() === userName.toLowerCase();
                 return (
                   <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                    {!isMe && <span className="text-[10px] font-semibold mb-1 ml-1 opacity-70">{msg.sender}</span>}
+                    {!isMe && <span className="text-[11px] font-bold mb-1 ml-1 text-blue-400">{msg.sender}</span>}
                     
                     {msg.type === 'poke' ? (
                       <div className="my-1 px-4 py-2 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-full text-xs font-bold flex items-center gap-2">
                         <BellRing className="w-4 h-4" /> {msg.sender} envió un Zumbido ⚡
                       </div>
                     ) : (
-                      <div className={`max-w-md rounded-2xl p-3.5 shadow-sm ${
+                      <div className={`max-w-[85%] sm:max-w-md rounded-2xl px-3.5 py-2.5 shadow-sm ${
                         isMe 
                           ? 'bg-blue-600 text-white rounded-br-none' 
                           : darkMode ? 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
                       }`}>
-                        <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                        <div className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${isMe ? 'text-blue-100' : 'opacity-60'}`}>
+                        <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
+                        <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${isMe ? 'text-blue-100' : 'opacity-60'}`}>
                           <span>{msg.time}</span>
-                          {isMe && <CheckCheck className="w-3 h-3" />}
+                          {isMe && <CheckCheck className="w-3.5 h-3.5" />}
                         </div>
                       </div>
                     )}
                   </div>
                 );
-              })}
-              <div ref={messagesEndRef} />
-            </div>
+              })
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
-            {/* Input Mensaje */}
-            <div className={`p-3 sm:p-4 border-t ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
-              <div className="flex items-center gap-2">
-                <label className={`p-3 rounded-xl border cursor-pointer ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`}>
-                  <Paperclip className="w-4 h-4" />
-                  <input type="file" onChange={handleFileUpload} className="hidden" />
-                </label>
+          {/* Barra de Entrada de Texto Adaptada a Celular */}
+          <div className={`p-2.5 sm:p-4 border-t ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <label className={`p-2.5 sm:p-3 rounded-xl border cursor-pointer shrink-0 ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`}>
+                <Paperclip className="w-4 h-4" />
+                <input type="file" onChange={handleFileUpload} className="hidden" />
+              </label>
 
-                <button 
-                  onClick={triggerPoke}
-                  className="p-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl shadow-md transition-transform active:scale-90 font-bold flex items-center gap-1"
-                  title="Enviar Zumbido"
-                >
-                  <BellRing className="w-4 h-4" />
-                </button>
-                
-                <div className={`flex-1 flex items-center rounded-xl border px-3 py-2 ${darkMode ? 'bg-slate-950 border-slate-800 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
-                  <input 
-                    type="text" 
-                    placeholder="Escribe un mensaje..."
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage('text')}
-                    className="w-full bg-transparent border-none outline-none text-xs"
-                  />
-                </div>
-
-                <button 
-                  onClick={() => handleSendMessage('text')}
-                  className="p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md transition-all"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+              <button 
+                onClick={triggerPoke}
+                className="p-2.5 sm:p-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl shadow-md transition-transform active:scale-90 font-bold shrink-0"
+                title="Enviar Zumbido"
+              >
+                <BellRing className="w-4 h-4" />
+              </button>
+              
+              <div className={`flex-1 flex items-center rounded-xl border px-3 py-2.5 ${darkMode ? 'bg-slate-950 border-slate-800 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
+                <input 
+                  type="text" 
+                  placeholder={`Mensaje en #${activeChannel?.name || 'canal'}...`}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage('text')}
+                  className="w-full bg-transparent border-none outline-none text-xs sm:text-sm"
+                />
               </div>
+
+              <button 
+                onClick={() => handleSendMessage('text')}
+                className="p-2.5 sm:p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md transition-all shrink-0"
+              >
+                <Send className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
