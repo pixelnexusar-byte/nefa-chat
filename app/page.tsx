@@ -332,7 +332,7 @@ export default function App() {
 
   const activeChannel = channels.find(c => c.id === currentChatId);
 
-  const safeRoomName = `NEFA_Software_Room_${currentChatId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const safeRoomName = `NEFA_Software_Room_${String(currentChatId).replace(/[^a-zA-Z0-9]/g, '_')}`;
   const jitsiUrl = `https://meet.jit.si/${safeRoomName}#userInfo.displayName="${encodeURIComponent(userName)}"&config.prejoinPageEnabled=false&config.startWithVideoMuted=${callType === 'voice'}&config.disableDeepLinking=true`;
 
   if (!isLoggedIn) {
