@@ -2,73 +2,86 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Nefa Chat">
-  <title>Nefa Chat · iPad</title>
+  <meta name="apple-mobile-web-app-title" content="NEFA Internal">
+  <title>NEFA Internal Workspace · iPad</title>
   <link rel="apple-touch-icon" href="/ipad/icon.png">
   <link rel="icon" type="image/png" href="/ipad/icon.png">
   <link rel="stylesheet" href="/ipad/app.css">
 </head>
 <body>
-  <noscript>Activá JavaScript para usar Nefa Chat.</noscript>
-  
-  <!-- PANTALLA DE LOGIN SIMPLE (COMO TU APP) -->
+  <!-- LOGIN -->
   <section id="login" class="login-screen">
     <div class="login-card">
-      <img class="login-logo" src="/ipad/icon.png" width="76" height="76" alt="Nefa">
+      <div class="logo-icon">⚡</div>
       <h1>NEFA Internal Workspace</h1>
-      <p class="login-copy">Ingresá tu nombre para acceder al canal de comunicación del equipo</p>
+      <p class="subtitle">Ingresa tu nombre para acceder al canal de comunicación del equipo</p>
       <form id="login-form">
-        <label for="username">Tu Nombre o Perfil:</label>
-        <input id="username" name="username" type="text" placeholder="Ej: Franco Sierralta" required>
-        <button id="login-button" class="primary" type="submit">Ingresar al Chat →</button>
+        <label>Tu Nombre o Perfil:</label>
+        <input id="username" type="text" placeholder="Ej. Franco Sierralta" value="Franco Sierralta" required>
+        <button type="submit" class="btn-primary">Ingresar al Chat →</button>
       </form>
     </div>
   </section>
 
-  <!-- APP PRINCIPAL -->
+  <!-- APP PRINCIPAL (SLACK STYLE) -->
   <div id="app" class="app hidden">
-    <header class="topbar">
-      <img class="brand-icon" src="/ipad/icon.png" width="42" height="42" alt="">
-      <div class="brand"><strong>NEFA CHAT</strong><span>Vista iPad</span></div>
-      <div class="top-actions">
-        <span id="sync" class="sync">Conectando…</span>
-        <button id="refresh" class="small-button">Actualizar</button>
-        <button id="menu-button" class="small-button">Menú</button>
-      </div>
-      <div id="menu" class="menu hidden">
-        <p id="user-name"></p>
-        <button id="logout">Cerrar sesión</button>
-      </div>
-    </header>
-    <main id="workspace" class="workspace">
-      <aside class="inbox">
-        <div class="inbox-head">
-          <h2>Conversaciones</h2>
-          <input id="search" type="search" placeholder="Buscar...">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="workspace-info">
+          <div class="workspace-icon">N</div>
+          <div>
+            <h2>NEFA Internal</h2>
+            <p>Canales de Equipo</p>
+          </div>
         </div>
-        <div id="contacts" class="contacts"></div>
-      </aside>
-      <section id="detail" class="detail">
-        <div id="welcome" class="welcome"><h2>Elegí un chat</h2></div>
-        <div id="selected" class="hidden">
-          <header class="client-header">
-            <button id="back" class="back">‹</button>
-            <div id="client-avatar" class="avatar"></div>
-            <div class="client-title"><h2 id="client-name"></h2></div>
-          </header>
-          <div id="messages" class="messages"></div>
-          <form id="reply-form" class="composer">
-            <textarea id="reply-text" placeholder="Escribí tu respuesta…"></textarea>
-            <button id="send-button" class="send-button" type="submit">Enviar</button>
-          </form>
+      </div>
+
+      <div class="tabs">
+        <button id="tab-channels" class="tab active"># Canales</button>
+        <button id="tab-dms" class="tab">👥 Directos</button>
+      </div>
+
+      <div class="sidebar-list" id="sidebar-list">
+        <!-- Se llena con JS -->
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="avatar-small" id="user-initials">FS</div>
+          <div>
+            <p id="user-display-name">Franco Sierralta</p>
+            <p class="status-online">Sesión Activa</p>
+          </div>
         </div>
-      </section>
+        <button id="logout-btn" class="btn-logout">Salir</button>
+      </div>
+    </aside>
+
+    <!-- ÁREA DE CHAT -->
+    <main class="chat-area">
+      <header class="chat-header">
+        <div class="chat-title">
+          <h2 id="chat-name"># general</h2>
+          <p id="chat-desc">Coordinación general del equipo</p>
+        </div>
+      </header>
+
+      <div class="messages-container" id="messages-container">
+        <!-- Se llena con JS -->
+      </div>
+
+      <div class="chat-input-area">
+        <button id="poke-btn" class="btn-poke" title="Enviar Zumbido">🔔</button>
+        <input id="chat-input" type="text" placeholder="Escribe un mensaje..." autocomplete="off">
+        <button id="send-btn" class="btn-send">Enviar</button>
+      </div>
     </main>
   </div>
-  
+
   <script src="/ipad/app.js"></script>
 </body>
 </html>
