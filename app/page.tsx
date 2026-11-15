@@ -76,11 +76,7 @@ export default function App() {
   const [presenceList, setPresenceList] = useState<PresenceUser[]>([]);
 
   // Canales
-  const [channels, setChannels] = useState<Channel[]>([
-    { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo' },
-    { id: 'gen-2', name: 'logistica-china', description: 'Embarques, contenedores y courier' },
-    { id: 'gen-3', name: 'soporte-it', description: 'Sistemas y automatizaciones' },
-  ]);
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string>('gen-1');
   const [isAddingChannel, setIsAddingChannel] = useState<boolean>(false);
   const [newChannelName, setNewChannelName] = useState<string>('');
@@ -89,7 +85,7 @@ export default function App() {
   const [editChannelName, setEditChannelName] = useState<string>('');
   const [editChannelDesc, setEditChannelDesc] = useState<string>('');
 
-  // Mensajes y Productividad (Opción 3: Buscador, Respuestas, Fijados, Tareas)
+  // Mensajes y Productividad
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState<string>('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -109,7 +105,6 @@ export default function App() {
   const lastTypedAtRef = useRef<number>(0);
   const titleIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sonido clásico MSN al entrar un mensaje nuevo (con alerta doble si te mencionan con @)
   const playMsnMessageSound = useCallback((isMention = false) => {
     if (!soundEnabled || myStatus === 'busy') return;
     try {
@@ -232,6 +227,7 @@ export default function App() {
     setIsLoggedIn(false);
   };
 
+  // Sincronización de presencia corregida con ?on_conflict=username
   const syncPresence = useCallback(async (overrideTypingChannel?: string) => {
     if (!userName) return;
     const typingChannel = typeof overrideTypingChannel === 'string'
@@ -239,14 +235,14 @@ export default function App() {
       : (isTypingRef.current ? currentChatId : '');
 
     try {
-      await sbFetch('presence', 'POST', [{
+      await sbFetch('presence?on_conflict=username', 'POST', [{
         username: userName,
         status: myStatus,
         custom_status: myCustomStatus,
         typing_in: typingChannel,
         typing_at: new Date().toISOString(),
         last_seen: new Date().toISOString(),
-      }], { Prefer: 'resolution=merge-duplicates' });
+      }], { Prefer: 'resolution=merge-duplicates,return=minimal' });
 
       const list = await sbFetch('presence?select=*&order=username.asc');
       if (Array.isArray(list)) {
@@ -257,10 +253,16 @@ export default function App() {
 
   const fetchChannels = useCallback(async () => {
     try {
-      const data = await sbFetch('channels?select=*&order=created_at.asc');
+      const data = await sbFetch('channels?select=*');
       if (Array.isArray(data) && data.length > 0) {
         setChannels(data);
-        setCurrentChatId(prev => data.some((c: Channel) => c.id === prev) ? prev : data[0].id);
+        setCurrentChatId(prev => data.some((c: Channel) => String(c.id) === String(prev)) ? prev : String(data[0].id));
+      } else if (Array.isArray(data) && data.length === 0) {
+        // Si la tabla estaba vacía en Supabase, insertamos el canal general
+        const initial = { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo' };
+        await sbFetch('channels', 'POST', [initial]);
+        setChannels([initial]);
+        setCurrentChatId('gen-1');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error desconocido';
@@ -321,23 +323,29 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
+  // Crear Canal compatible tanto con ID de texto como con ID numérico en Supabase
   const handleCreateChannel = async () => {
     if (!newChannelName.trim()) return;
     const cleanName = newChannelName.trim().toLowerCase().replace(/\s+/g, '-');
-    const newCh: Channel = {
-      id: `ch-${Date.now()}`,
-      name: cleanName,
-      description: newChannelDesc.trim() || 'Canal del equipo'
-    };
+    const cleanDesc = newChannelDesc.trim() || 'Canal del equipo';
+    const newId = `ch-${Date.now()}`;
 
     try {
-      await sbFetch('channels', 'POST', [newCh]);
-      setChannels(prev => [...prev, newCh]);
-      setCurrentChatId(newCh.id);
+      let created: Channel[] | null = null;
+      try {
+        created = await sbFetch('channels', 'POST', [{ id: newId, name: cleanName, description: cleanDesc }]);
+      } catch {
+        // Respaldo automático si la columna ID en Supabase aún es numérica (bigint)
+        created = await sbFetch('channels', 'POST', [{ name: cleanName, description: cleanDesc }]);
+      }
+      const added = Array.isArray(created) && created[0] ? created[0] : { id: newId, name: cleanName, description: cleanDesc };
+      setChannels(prev => [...prev, added]);
+      setCurrentChatId(String(added.id));
       setNewChannelName('');
       setNewChannelDesc('');
       setIsAddingChannel(false);
       setSidebarOpen(false);
+      setDbError(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error';
       setDbError(`No se pudo crear el canal: ${msg}`);
@@ -346,7 +354,7 @@ export default function App() {
 
   const startEditingChannel = (ch: Channel, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditingChannelId(ch.id);
+    setEditingChannelId(String(ch.id));
     setEditChannelName(ch.name);
     setEditChannelDesc(ch.description || '');
   };
@@ -361,25 +369,37 @@ export default function App() {
         name: cleanName,
         description: editChannelDesc.trim(),
       });
-      setChannels(prev => prev.map(c => c.id === id ? { ...c, name: cleanName, description: editChannelDesc.trim() } : c));
+      setChannels(prev => prev.map(c => String(c.id) === String(id) ? { ...c, name: cleanName, description: editChannelDesc.trim() } : c));
       setEditingChannelId(null);
+      setDbError(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error';
       setDbError(`No se pudo editar el canal: ${msg}`);
     }
   };
 
-  const handleDeleteChannel = async (id: string, e: React.MouseEvent) => {
+  // Borrar Canal: primero limpia sus mensajes para que Supabase no bloquee por Foreign Key
+  const handleDeleteChannel = async (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (channels.length <= 1) return;
+    if (channels.length <= 1) {
+      setDbError('Debe quedar al menos 1 canal activo.');
+      return;
+    }
+    if (!window.confirm(`¿Seguro que querés eliminar el canal #${name} y sus mensajes?`)) return;
+
     try {
+      await sbFetch(`messages?channel_id=eq.${encodeURIComponent(id)}`, 'DELETE');
       await sbFetch(`channels?id=eq.${encodeURIComponent(id)}`, 'DELETE');
-      const remaining = channels.filter(c => c.id !== id);
+      const remaining = channels.filter(c => String(c.id) !== String(id));
       setChannels(remaining);
-      if (currentChatId === id && remaining.length > 0) {
-        setCurrentChatId(remaining[0].id);
+      if (String(currentChatId) === String(id) && remaining.length > 0) {
+        setCurrentChatId(String(remaining[0].id));
       }
-    } catch {}
+      setDbError(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error';
+      setDbError(`No se pudo eliminar el canal: ${msg}`);
+    }
   };
   const handleEditCustomStatus = () => {
     const val = prompt('Escribí tu frase personal estilo MSN (ej. Cotizando embarque / En reunión):', myCustomStatus);
@@ -395,7 +415,6 @@ export default function App() {
     try { localStorage.setItem('nefa_status', newSt); } catch {}
   };
 
-  // --- FUNCIONES OPCIÓN 3: FIJAR MENSAJES, CHECKLISTS Y RESPUESTAS CITADAS ---
   const handleTogglePin = async (msg: Message) => {
     const newType = msg.type === 'pinned' ? 'text' : 'pinned';
     setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, type: newType } : m));
@@ -575,18 +594,55 @@ export default function App() {
     handleSendMessage('file', `📁 Archivo adjunto: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
   };
 
-  const activeChannel = channels.find(c => c.id === currentChatId);
+  const activeChannel = channels.find(c => String(c.id) === String(currentChatId));
   const nowMs = Date.now();
 
-  const onlineUsersCount = presenceList.filter(p => nowMs - new Date(p.last_seen).getTime() < 40000).length;
-  const typingUsers = presenceList.filter(p => 
-    nowMs - new Date(p.last_seen).getTime() < 40000 &&
-    p.typing_in === currentChatId &&
+  // Unificamos los usuarios de la tabla `presence` + tú mismo + todos los que participaron en el chat
+  const combinedRoster: PresenceUser[] = React.useMemo(() => {
+    const map = new Map<string, PresenceUser>();
+
+    // 1. Usuarios registrados en la tabla presence
+    presenceList.forEach(p => {
+      if (p.username) map.set(p.username.toLowerCase(), p);
+    });
+
+    // 2. Asegurar que el usuario actual siempre figure activo con su estado actual
+    if (userName) {
+      map.set(userName.toLowerCase(), {
+        username: userName,
+        status: myStatus,
+        custom_status: myCustomStatus,
+        typing_in: isTypingRef.current ? currentChatId : '',
+        typing_at: new Date().toISOString(),
+        last_seen: new Date().toISOString(),
+      });
+    }
+
+    // 3. Agregar cualquier miembro del equipo que haya enviado mensajes recientes en el canal
+    messages.forEach(m => {
+      if (m.sender && !map.has(m.sender.toLowerCase())) {
+        map.set(m.sender.toLowerCase(), {
+          username: m.sender,
+          status: 'online',
+          custom_status: '',
+          typing_in: '',
+          typing_at: m.created_at || new Date(0).toISOString(),
+          last_seen: m.created_at || new Date().toISOString(),
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.username.localeCompare(b.username));
+  }, [presenceList, messages, userName, myStatus, myCustomStatus, currentChatId]);
+
+  const onlineUsersCount = combinedRoster.filter(p => nowMs - new Date(p.last_seen).getTime() < 90000).length;
+  const typingUsers = combinedRoster.filter(p => 
+    nowMs - new Date(p.last_seen).getTime() < 90000 &&
+    String(p.typing_in) === String(currentChatId) &&
     nowMs - new Date(p.typing_at).getTime() < 6000 &&
     p.username.toLowerCase() !== userName.toLowerCase()
   ).map(p => p.username);
 
-  // Mensajes fijados y filtro de búsqueda en vivo
   const pinnedMessages = messages.filter(m => m.type === 'pinned');
   const displayedMessages = searchQuery.trim()
     ? messages.filter(m =>
@@ -738,7 +794,7 @@ export default function App() {
                 <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Canales</span>
                 <button 
                   onClick={() => setIsAddingChannel(!isAddingChannel)}
-                  className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded-lg flex items-center gap-1 font-medium"
+                  className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" /> Nuevo
                 </button>
@@ -751,6 +807,8 @@ export default function App() {
                     placeholder="Nombre del canal (ej. ventas)"
                     value={newChannelName}
                     onChange={(e) => setNewChannelName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateChannel()}
+                    autoFocus
                     className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
                   />
                   <input
@@ -758,11 +816,12 @@ export default function App() {
                     placeholder="Descripción corta"
                     value={newChannelDesc}
                     onChange={(e) => setNewChannelDesc(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateChannel()}
                     className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
                   />
                   <div className="flex justify-end gap-2 pt-1">
                     <button onClick={() => setIsAddingChannel(false)} className="text-xs text-slate-400 px-2 py-1">Cancelar</button>
-                    <button onClick={handleCreateChannel} className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg font-semibold">Crear</button>
+                    <button onClick={handleCreateChannel} className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded-lg font-semibold">Crear Canal</button>
                   </div>
                 </div>
               )}
@@ -770,14 +829,14 @@ export default function App() {
               {channels.map(ch => (
                 <div
                   key={ch.id}
-                  onClick={() => { setCurrentChatId(ch.id); setSidebarOpen(false); setReplyingTo(null); setSearchQuery(''); }}
+                  onClick={() => { setCurrentChatId(String(ch.id)); setSidebarOpen(false); setReplyingTo(null); setSearchQuery(''); }}
                   className={`group w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
-                    currentChatId === ch.id 
+                    String(currentChatId) === String(ch.id) 
                       ? (darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200') 
                       : (darkMode ? 'text-slate-300 hover:bg-slate-800/60' : 'text-slate-700 hover:bg-slate-100')
                   }`}
                 >
-                  {editingChannelId === ch.id ? (
+                  {editingChannelId === String(ch.id) ? (
                     <div className="flex-1 space-y-1.5 mr-2" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="text"
@@ -793,7 +852,7 @@ export default function App() {
                         className="w-full px-2 py-1 text-[10px] rounded bg-slate-950 border border-slate-700 text-slate-300 outline-none"
                       />
                       <div className="flex gap-2 pt-1">
-                        <button onClick={(e) => handleSaveChannelEdit(ch.id, e)} className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                        <button onClick={(e) => handleSaveChannelEdit(String(ch.id), e)} className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
                           <Check className="w-3 h-3" /> Guardar
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); setEditingChannelId(null); }} className="text-slate-400 text-[10px]">
@@ -810,17 +869,18 @@ export default function App() {
                           {ch.description && <p className="text-[10px] opacity-60 truncate">{ch.description}</p>}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 opacity-80 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      {/* Botones de editar y eliminar siempre visibles */}
+                      <div className="flex items-center gap-1 shrink-0">
                         <button 
                           onClick={(e) => startEditingChannel(ch, e)}
                           className="p-1.5 hover:bg-slate-700/50 rounded-lg text-slate-400 hover:text-white"
-                          title="Editar canal"
+                          title="Renombrar canal"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         {channels.length > 1 && (
                           <button 
-                            onClick={(e) => handleDeleteChannel(ch.id, e)}
+                            onClick={(e) => handleDeleteChannel(String(ch.id), ch.name, e)}
                             className="p-1.5 hover:bg-red-500/20 rounded-lg text-slate-400 hover:text-red-400"
                             title="Eliminar canal"
                           >
@@ -834,68 +894,58 @@ export default function App() {
               ))}
             </div>
 
-            {/* EQUIPO EN LÍNEA (Tocando un compañero lo mencionás con @) */}
+            {/* EQUIPO EN LÍNEA (TODOS LOS MIEMBROS CONECTADOS Y RECIENTES) */}
             <div className={`space-y-1.5 pt-3 border-t ${darkMode ? 'border-slate-800/70' : 'border-slate-200'}`}>
               <div className="flex items-center justify-between px-2">
                 <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Equipo en línea</span>
                 <span className="text-[10px] font-bold text-emerald-400">
-                  {onlineUsersCount || 1} {(onlineUsersCount || 1) === 1 ? 'activo' : 'activos'}
+                  {onlineUsersCount} {onlineUsersCount === 1 ? 'activo' : 'activos'}
                 </span>
               </div>
 
               <div className="space-y-1">
-                {presenceList.length === 0 ? (
-                  <div className="px-2.5 py-1.5 rounded-xl flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                    <div className="truncate flex-1">
-                      <p className="text-xs font-semibold truncate">{userName}</p>
-                      {myCustomStatus && <p className="text-[10px] text-slate-400 italic truncate">“{myCustomStatus}”</p>}
-                    </div>
-                  </div>
-                ) : (
-                  presenceList.map((p) => {
-                    const isOnline = nowMs - new Date(p.last_seen).getTime() < 40000;
-                    const dotColor = !isOnline
-                      ? 'bg-slate-600 opacity-50'
-                      : p.status === 'away'
-                      ? 'bg-amber-500 shadow-sm shadow-amber-500/50'
-                      : p.status === 'busy'
-                      ? 'bg-red-500 shadow-sm shadow-red-500/50'
-                      : 'bg-emerald-500 shadow-sm shadow-emerald-500/50';
+                {combinedRoster.map((p) => {
+                  const isOnline = nowMs - new Date(p.last_seen).getTime() < 90000;
+                  const dotColor = !isOnline
+                    ? 'bg-slate-600 opacity-50'
+                    : p.status === 'away'
+                    ? 'bg-amber-500 shadow-sm shadow-amber-500/50'
+                    : p.status === 'busy'
+                    ? 'bg-red-500 shadow-sm shadow-red-500/50'
+                    : 'bg-emerald-500 shadow-sm shadow-emerald-500/50';
 
-                    const statusLabel = !isOnline
-                      ? ' (Desconectado)'
-                      : p.status === 'away'
-                      ? ' (Ausente)'
-                      : p.status === 'busy'
-                      ? ' (Ocupado)'
-                      : '';
+                  const statusLabel = !isOnline
+                    ? ' (Desconectado)'
+                    : p.status === 'away'
+                    ? ' (Ausente)'
+                    : p.status === 'busy'
+                    ? ' (Ocupado)'
+                    : '';
 
-                    return (
-                      <div
-                        key={p.username}
-                        onClick={() => {
-                          const short = p.username.split(' ')[0];
-                          setInputText(prev => `${prev}@${short} `);
-                          setSidebarOpen(false);
-                          inputRef.current?.focus();
-                        }}
-                        title="Tocá para mencionar con @"
-                        className="px-2.5 py-1.5 rounded-xl flex items-center gap-2.5 cursor-pointer hover:bg-slate-800/40"
-                      >
-                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
-                        <div className="truncate flex-1">
-                          <p className="text-xs font-semibold truncate">
-                            {p.username} <span className="text-[10px] font-normal opacity-60">{statusLabel}</span>
-                          </p>
-                          {p.custom_status && (
-                            <p className="text-[10px] text-slate-400 italic truncate">“{p.custom_status}”</p>
-                          )}
-                        </div>
+                  return (
+                    <div
+                      key={p.username}
+                      onClick={() => {
+                        const short = p.username.split(' ')[0];
+                        setInputText(prev => `${prev}@${short} `);
+                        setSidebarOpen(false);
+                        inputRef.current?.focus();
+                      }}
+                      title="Tocá para mencionar con @"
+                      className="px-2.5 py-1.5 rounded-xl flex items-center gap-2.5 cursor-pointer hover:bg-slate-800/40"
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
+                      <div className="truncate flex-1">
+                        <p className="text-xs font-semibold truncate">
+                          {p.username} <span className="text-[10px] font-normal opacity-60">{statusLabel}</span>
+                        </p>
+                        {p.custom_status && (
+                          <p className="text-[10px] text-slate-400 italic truncate">“{p.custom_status}”</p>
+                        )}
                       </div>
-                    );
-                  })
-                )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -949,7 +999,6 @@ export default function App() {
         {/* ÁREA DE CHAT PRINCIPAL */}
         <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
           
-          {/* CABECERA CON LUPA BUSCADORA Y BOTONES DE LLAMADA */}
           <div className={`h-14 sm:h-16 px-3 sm:px-6 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0 gap-2`}>
             <div className="flex items-center gap-2.5 truncate">
               <button 
@@ -1011,7 +1060,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* BARRA DE MENSAJES FIJADOS (PINNED) */}
+          {/* BARRA DE MENSAJES FIJADOS */}
           {pinnedMessages.length > 0 && (
             <div className={`px-3 sm:px-6 py-2 border-b flex items-center justify-between gap-2 text-xs shrink-0 ${
               darkMode ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'
@@ -1081,7 +1130,6 @@ export default function App() {
                             ? 'bg-blue-600 text-white rounded-br-none' 
                             : darkMode ? 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
                         }`}>
-                          {/* Cita de respuesta si existe */}
                           {parsed.quoteHeader && (
                             <div className={`text-[11px] mb-1.5 px-2.5 py-1 rounded-lg border-l-2 ${
                               isMe ? 'bg-blue-700/60 border-blue-200 text-blue-100' : 'bg-slate-800/80 border-blue-400 text-slate-300'
@@ -1090,7 +1138,6 @@ export default function App() {
                             </div>
                           )}
 
-                          {/* Tarea interactiva o texto normal */}
                           {parsed.isTask ? (
                             <div
                               onClick={() => handleToggleTask(msg)}
@@ -1118,8 +1165,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Acciones rápidas del mensaje: Responder y Fijar */}
-                        <div className="flex items-center gap-0.5 opacity-70 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <div className="flex items-center gap-0.5 opacity-80 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                           <button
                             onClick={() => handleStartReply(msg)}
                             className={`p-1.5 rounded-lg border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-white border-slate-200 text-slate-600'}`}
@@ -1148,14 +1194,12 @@ export default function App() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* INDICADOR DE "ESCRIBIENDO..." EN VIVO */}
           {typingUsers.length > 0 && (
             <div className={`px-4 py-1 text-[11px] italic text-blue-400 ${darkMode ? 'bg-slate-950' : 'bg-slate-50'} shrink-0`}>
               💬 {typingUsers.join(', ')} está escribiendo...
             </div>
           )}
 
-          {/* PREVISUALIZACIÓN DE RESPUESTA CITADA */}
           {replyingTo && (
             <div className={`px-4 py-2 border-t flex items-center justify-between text-xs shrink-0 ${
               darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
@@ -1171,7 +1215,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Barra de Entrada con botón de Checklist (☑️) */}
+          {/* Barra de Entrada */}
           <div className={`p-2.5 sm:p-4 border-t ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
             <div className="flex items-center gap-1.5 sm:gap-2">
               <label className={`p-2.5 sm:p-3 rounded-xl border cursor-pointer shrink-0 ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`} title="Adjuntar archivo">
