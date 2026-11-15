@@ -3,7 +3,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Hash, Send, Paperclip, Sun, Moon, Phone, Video, CheckCheck, 
   Zap, ArrowRight, BellRing, Menu, X, Plus, Edit2, Trash2, Check, 
-  AlertCircle, PhoneCall, Volume2, VolumeX, MessageSquare
+  AlertCircle, PhoneCall, Volume2, VolumeX, MessageSquare,
+  Pin, Search, Reply, CheckSquare, Square
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://fedzgvgobjeokxfhvmok.supabase.co';
@@ -74,6 +75,7 @@ export default function App() {
   const [myCustomStatus, setMyCustomStatus] = useState<string>('');
   const [presenceList, setPresenceList] = useState<PresenceUser[]>([]);
 
+  // Canales
   const [channels, setChannels] = useState<Channel[]>([
     { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo' },
     { id: 'gen-2', name: 'logistica-china', description: 'Embarques, contenedores y courier' },
@@ -87,37 +89,50 @@ export default function App() {
   const [editChannelName, setEditChannelName] = useState<string>('');
   const [editChannelDesc, setEditChannelDesc] = useState<string>('');
 
+  // Mensajes y Productividad (Opción 3: Buscador, Respuestas, Fijados, Tareas)
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState<string>('');
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [searchOpen, setSearchOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [dbError, setDbError] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState<boolean>(false);
 
+  // Llamadas
   const [isInCall, setIsInCall] = useState<boolean>(false);
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const lastProcessedMsgId = useRef<string | null>(null);
   const isTypingRef = useRef<boolean>(false);
   const lastTypedAtRef = useRef<number>(0);
   const titleIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sonido clásico MSN al entrar un mensaje nuevo ("Tuc-tuc-tín")
-  const playMsnMessageSound = useCallback(() => {
+  // Sonido clásico MSN al entrar un mensaje nuevo (con alerta doble si te mencionan con @)
+  const playMsnMessageSound = useCallback((isMention = false) => {
     if (!soundEnabled || myStatus === 'busy') return;
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
-      const notes = [
-        { f: 587.33, t: 0, d: 0.09 },
-        { f: 880.0, t: 0.10, d: 0.09 },
-        { f: 1174.66, t: 0.20, d: 0.22 },
-      ];
+      const notes = isMention
+        ? [
+            { f: 783.99, t: 0, d: 0.08 },
+            { f: 1046.50, t: 0.09, d: 0.08 },
+            { f: 783.99, t: 0.18, d: 0.08 },
+            { f: 1318.51, t: 0.27, d: 0.25 },
+          ]
+        : [
+            { f: 587.33, t: 0, d: 0.09 },
+            { f: 880.0, t: 0.10, d: 0.09 },
+            { f: 1174.66, t: 0.20, d: 0.22 },
+          ];
       notes.forEach((n) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(n.f, ctx.currentTime + n.t);
-        gain.gain.setValueAtTime(0.18, ctx.currentTime + n.t);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime + n.t);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.t + n.d);
         osc.connect(gain);
         gain.connect(ctx.destination);
@@ -127,12 +142,15 @@ export default function App() {
     } catch {}
   }, [soundEnabled, myStatus]);
 
-  // Pestaña parpadeante estilo MSN cuando entra un mensaje
-  const flashTabTitle = useCallback((sender: string) => {
+  const flashTabTitle = useCallback((sender: string, isMention = false) => {
     if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
     let toggle = false;
     titleIntervalRef.current = setInterval(() => {
-      document.title = toggle ? 'NEFA Software Chat' : `💬 ¡Mensaje de ${sender}!`;
+      document.title = toggle
+        ? 'NEFA Software Chat'
+        : isMention
+        ? `🔔 ¡${sender} te mencionó!`
+        : `💬 ¡Mensaje de ${sender}!`;
       toggle = !toggle;
     }, 900);
   }, []);
@@ -214,7 +232,6 @@ export default function App() {
     setIsLoggedIn(false);
   };
 
-  // Sincronización silenciosa de presencia y "escribiendo..."
   const syncPresence = useCallback(async (overrideTypingChannel?: string) => {
     if (!userName) return;
     const typingChannel = typeof overrideTypingChannel === 'string'
@@ -235,9 +252,7 @@ export default function App() {
       if (Array.isArray(list)) {
         setPresenceList(list);
       }
-    } catch {
-      // Si la tabla presence aún no fue creada en Supabase, falla en silencio sin molestar
-    }
+    } catch {}
   }, [userName, myStatus, myCustomStatus, currentChatId]);
 
   const fetchChannels = useCallback(async () => {
@@ -263,12 +278,15 @@ export default function App() {
           const latest = data[data.length - 1] as Message;
           if (!isInitial && lastProcessedMsgId.current && lastProcessedMsgId.current !== latest.id) {
             if (latest.sender.toLowerCase() !== userName.toLowerCase()) {
+              const firstName = userName.split(' ')[0].toLowerCase();
+              const isMention = (latest.text || '').toLowerCase().includes(`@${firstName}`) ||
+                                (latest.text || '').toLowerCase().includes(`@${userName.toLowerCase()}`);
               if (latest.type === 'poke') {
                 playMsnNudgeEffect();
               } else {
-                playMsnMessageSound();
+                playMsnMessageSound(isMention);
               }
-              flashTabTitle(latest.sender);
+              flashTabTitle(latest.sender, isMention);
             }
           }
           lastProcessedMsgId.current = latest.id;
@@ -377,6 +395,92 @@ export default function App() {
     try { localStorage.setItem('nefa_status', newSt); } catch {}
   };
 
+  // --- FUNCIONES OPCIÓN 3: FIJAR MENSAJES, CHECKLISTS Y RESPUESTAS CITADAS ---
+  const handleTogglePin = async (msg: Message) => {
+    const newType = msg.type === 'pinned' ? 'text' : 'pinned';
+    setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, type: newType } : m));
+    try {
+      await sbFetch(`messages?id=eq.${encodeURIComponent(msg.id)}`, 'PATCH', { type: newType });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Error';
+      setDbError(`No se pudo fijar el mensaje: ${errMsg}`);
+    }
+  };
+
+  const handleToggleTask = async (msg: Message) => {
+    const raw = msg.text || '';
+    let updated = raw;
+    const shortName = userName.split(' ')[0];
+
+    if (raw.includes('[ ] ')) {
+      updated = raw.replace('[ ] ', '[x] ') + ` (✓ ${shortName})`;
+    } else if (raw.includes('[x] ')) {
+      updated = raw.replace('[x] ', '[ ] ').replace(/\s*\(✓ [^)]+\)$/, '');
+    } else {
+      return;
+    }
+
+    setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, text: updated } : m));
+    try {
+      await sbFetch(`messages?id=eq.${encodeURIComponent(msg.id)}`, 'PATCH', { text: updated });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Error';
+      setDbError(`No se pudo actualizar la tarea: ${errMsg}`);
+    }
+  };
+
+  const insertTaskTemplate = () => {
+    if (inputText.startsWith('[ ] ')) {
+      setInputText(inputText.replace(/^\[ \]\s*/, ''));
+    } else {
+      setInputText(`[ ] ${inputText}`);
+    }
+    inputRef.current?.focus();
+  };
+
+  const handleStartReply = (msg: Message) => {
+    setReplyingTo(msg);
+    inputRef.current?.focus();
+  };
+
+  const parseMessageBody = (rawText?: string) => {
+    const txt = rawText || '';
+    let quoteHeader: string | null = null;
+    let mainText = txt;
+
+    if (txt.startsWith('❝ ')) {
+      const newlineIdx = txt.indexOf('\n');
+      if (newlineIdx !== -1) {
+        quoteHeader = txt.substring(0, newlineIdx);
+        mainText = txt.substring(newlineIdx + 1);
+      }
+    }
+
+    const isTaskUnchecked = mainText.startsWith('[ ] ');
+    const isTaskChecked = mainText.startsWith('[x] ');
+    const isTask = isTaskUnchecked || isTaskChecked;
+    const cleanTaskText = isTask ? mainText.substring(4) : mainText;
+
+    return { quoteHeader, mainText, isTask, isTaskChecked, cleanTaskText };
+  };
+
+  const renderFormattedText = (text: string) => {
+    const parts = text.split(/(@[\wáéíóúÁÉÍÓÚñÑ.-]+)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith('@') && part.length > 1) {
+        return (
+          <span
+            key={idx}
+            className="bg-amber-400/25 text-amber-300 border border-amber-400/40 px-1.5 py-0.5 rounded-md font-bold"
+          >
+            {part}
+          </span>
+        );
+      }
+      return <React.Fragment key={idx}>{part}</React.Fragment>;
+    });
+  };
+
   const triggerPoke = async () => {
     playMsnNudgeEffect();
 
@@ -422,15 +526,21 @@ export default function App() {
   };
 
   const handleSendMessage = async (customType: string = 'text', textContent?: string) => {
-    const content = textContent ?? inputText;
-    if (!content.trim() && customType === 'text') return;
+    const rawContent = textContent ?? inputText;
+    if (!rawContent.trim() && customType === 'text') return;
+
+    let finalContent = rawContent;
+    if (replyingTo && customType === 'text') {
+      const cleanOriginal = (replyingTo.text || '').replace(/^❝ [^\n]+\n/, '').substring(0, 65);
+      finalContent = `❝ @${replyingTo.sender}: ${cleanOriginal}\n${rawContent}`;
+    }
 
     isTypingRef.current = false;
     const newMessage: Message = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       channel_id: currentChatId,
       sender: userName,
-      text: content,
+      text: finalContent,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       type: customType
     };
@@ -438,6 +548,7 @@ export default function App() {
     lastProcessedMsgId.current = newMessage.id;
     setMessages(prev => [...prev, newMessage]);
     setInputText('');
+    setReplyingTo(null);
 
     try {
       await sbFetch('messages', 'POST', [newMessage]);
@@ -474,6 +585,15 @@ export default function App() {
     nowMs - new Date(p.typing_at).getTime() < 6000 &&
     p.username.toLowerCase() !== userName.toLowerCase()
   ).map(p => p.username);
+
+  // Mensajes fijados y filtro de búsqueda en vivo
+  const pinnedMessages = messages.filter(m => m.type === 'pinned');
+  const displayedMessages = searchQuery.trim()
+    ? messages.filter(m =>
+        (m.text || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (m.sender || '').toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : messages;
 
   const safeRoomName = `NEFA_Software_Room_${String(currentChatId).replace(/[^a-zA-Z0-9]/g, '_')}`;
   const jitsiUrl = `https://meet.jit.si/${safeRoomName}#userInfo.displayName="${encodeURIComponent(userName)}"&config.prejoinPageEnabled=false&config.startWithVideoMuted=${callType === 'voice'}&config.disableDeepLinking=true`;
@@ -650,7 +770,7 @@ export default function App() {
               {channels.map(ch => (
                 <div
                   key={ch.id}
-                  onClick={() => { setCurrentChatId(ch.id); setSidebarOpen(false); }}
+                  onClick={() => { setCurrentChatId(ch.id); setSidebarOpen(false); setReplyingTo(null); setSearchQuery(''); }}
                   className={`group w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
                     currentChatId === ch.id 
                       ? (darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200') 
@@ -714,7 +834,7 @@ export default function App() {
               ))}
             </div>
 
-            {/* EQUIPO EN LÍNEA (MSN PRESENCE) */}
+            {/* EQUIPO EN LÍNEA (Tocando un compañero lo mencionás con @) */}
             <div className={`space-y-1.5 pt-3 border-t ${darkMode ? 'border-slate-800/70' : 'border-slate-200'}`}>
               <div className="flex items-center justify-between px-2">
                 <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Equipo en línea</span>
@@ -752,7 +872,17 @@ export default function App() {
                       : '';
 
                     return (
-                      <div key={p.username} className="px-2.5 py-1.5 rounded-xl flex items-center gap-2.5">
+                      <div
+                        key={p.username}
+                        onClick={() => {
+                          const short = p.username.split(' ')[0];
+                          setInputText(prev => `${prev}@${short} `);
+                          setSidebarOpen(false);
+                          inputRef.current?.focus();
+                        }}
+                        title="Tocá para mencionar con @"
+                        className="px-2.5 py-1.5 rounded-xl flex items-center gap-2.5 cursor-pointer hover:bg-slate-800/40"
+                      >
                         <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
                         <div className="truncate flex-1">
                           <p className="text-xs font-semibold truncate">
@@ -770,7 +900,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* FOOTER PERFIL CON SELECTOR DE ESTADO Y FRASE MSN */}
+          {/* FOOTER PERFIL MSN */}
           <div className={`p-3 border-t ${darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'} space-y-2`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5 truncate">
@@ -782,16 +912,12 @@ export default function App() {
                   <p 
                     onClick={handleEditCustomStatus}
                     className="text-[10px] text-blue-400 hover:underline cursor-pointer truncate max-w-[155px]"
-                    title="Tocá para cambiar tu frase personal"
                   >
                     {myCustomStatus ? `“${myCustomStatus}”` : '✏️ Escribir frase personal...'}
                   </p>
                 </div>
               </div>
-              <button 
-                onClick={handleLogout} 
-                className="text-xs text-red-400 hover:underline px-2 py-1"
-              >
+              <button onClick={handleLogout} className="text-xs text-red-400 hover:underline px-2 py-1">
                 Cambiar
               </button>
             </div>
@@ -813,7 +939,6 @@ export default function App() {
                 className={`px-2.5 py-1.5 text-[11px] rounded-lg border flex items-center gap-1 ${
                   darkMode ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700'
                 }`}
-                title="Cambiar frase personal"
               >
                 <MessageSquare className="w-3 h-3" /> Frase
               </button>
@@ -824,7 +949,8 @@ export default function App() {
         {/* ÁREA DE CHAT PRINCIPAL */}
         <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
           
-          <div className={`h-14 sm:h-16 px-3 sm:px-6 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0`}>
+          {/* CABECERA CON LUPA BUSCADORA Y BOTONES DE LLAMADA */}
+          <div className={`h-14 sm:h-16 px-3 sm:px-6 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0 gap-2`}>
             <div className="flex items-center gap-2.5 truncate">
               <button 
                 onClick={() => setSidebarOpen(true)}
@@ -843,6 +969,31 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-1.5 shrink-0">
+              {searchOpen ? (
+                <div className={`flex items-center rounded-xl border px-2.5 py-1.5 ${darkMode ? 'bg-slate-950 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>
+                  <Search className="w-3.5 h-3.5 text-slate-400 mr-1.5" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar en el canal..."
+                    autoFocus
+                    className="bg-transparent outline-none text-xs w-28 sm:w-44"
+                  />
+                  <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} className="text-slate-400 hover:text-white ml-1">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setSearchOpen(true)} 
+                  className={`p-2.5 rounded-xl border transition-colors ${darkMode ? 'border-slate-800 bg-slate-800/50 text-slate-300 hover:text-white' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
+                  title="Buscar mensajes"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+              )}
+
               <button 
                 onClick={() => startCall('voice', true)} 
                 className={`p-2.5 rounded-xl border transition-colors ${darkMode ? 'border-slate-800 bg-slate-800/50 hover:bg-emerald-600/20 hover:border-emerald-500/40 text-slate-300 hover:text-emerald-400' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
@@ -860,19 +1011,42 @@ export default function App() {
             </div>
           </div>
 
+          {/* BARRA DE MENSAJES FIJADOS (PINNED) */}
+          {pinnedMessages.length > 0 && (
+            <div className={`px-3 sm:px-6 py-2 border-b flex items-center justify-between gap-2 text-xs shrink-0 ${
+              darkMode ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'
+            }`}>
+              <div className="flex items-center gap-2 truncate">
+                <Pin className="w-3.5 h-3.5 text-amber-400 shrink-0 rotate-45" />
+                <div className="truncate">
+                  <span className="font-bold mr-1.5">Fijado ({pinnedMessages[pinnedMessages.length - 1].sender}):</span>
+                  <span className="opacity-90">{(pinnedMessages[pinnedMessages.length - 1].text || '').replace(/^❝ [^\n]+\n/, '')}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => handleTogglePin(pinnedMessages[pinnedMessages.length - 1])}
+                className="text-[10px] underline opacity-75 hover:opacity-100 shrink-0"
+              >
+                Desfijar
+              </button>
+            </div>
+          )}
+
           {/* Lista de Mensajes */}
           <div className={`flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 ${darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
-            {messages.length === 0 ? (
+            {displayedMessages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center opacity-50 text-xs">
                 <Hash className="w-8 h-8 mb-2 stroke-1" />
-                <p>No hay mensajes en #{activeChannel?.name}.</p>
-                <p>¡Escribí el primero para iniciar la charla!</p>
+                <p>{searchQuery ? `Sin resultados para "${searchQuery}"` : `No hay mensajes en #${activeChannel?.name}.`}</p>
               </div>
             ) : (
-              messages.map((msg) => {
+              displayedMessages.map((msg) => {
                 const isMe = msg.sender.toLowerCase() === userName.toLowerCase();
+                const isPinned = msg.type === 'pinned';
+                const parsed = parseMessageBody(msg.text);
+
                 return (
-                  <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                  <div key={msg.id} className={`group flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                     {!isMe && <span className="text-[11px] font-bold mb-1 ml-1 text-blue-400">{msg.sender}</span>}
                     
                     {msg.type === 'poke' ? (
@@ -899,15 +1073,71 @@ export default function App() {
                         </button>
                       </div>
                     ) : (
-                      <div className={`max-w-[85%] sm:max-w-md rounded-2xl px-3.5 py-2.5 shadow-sm ${
-                        isMe 
-                          ? 'bg-blue-600 text-white rounded-br-none' 
-                          : darkMode ? 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
-                      }`}>
-                        <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
-                        <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${isMe ? 'text-blue-100' : 'opacity-60'}`}>
-                          <span>{msg.time}</span>
-                          {isMe && <CheckCheck className="w-3.5 h-3.5" />}
+                      <div className={`flex items-center gap-1.5 max-w-[90%] sm:max-w-md ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <div className={`rounded-2xl px-3.5 py-2.5 shadow-sm relative ${
+                          isPinned ? 'ring-2 ring-amber-400/70 ' : ''
+                        }${
+                          isMe 
+                            ? 'bg-blue-600 text-white rounded-br-none' 
+                            : darkMode ? 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
+                        }`}>
+                          {/* Cita de respuesta si existe */}
+                          {parsed.quoteHeader && (
+                            <div className={`text-[11px] mb-1.5 px-2.5 py-1 rounded-lg border-l-2 ${
+                              isMe ? 'bg-blue-700/60 border-blue-200 text-blue-100' : 'bg-slate-800/80 border-blue-400 text-slate-300'
+                            }`}>
+                              {parsed.quoteHeader}
+                            </div>
+                          )}
+
+                          {/* Tarea interactiva o texto normal */}
+                          {parsed.isTask ? (
+                            <div
+                              onClick={() => handleToggleTask(msg)}
+                              className="flex items-start gap-2 cursor-pointer select-none py-0.5"
+                            >
+                              {parsed.isTaskChecked ? (
+                                <CheckSquare className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5" />
+                              ) : (
+                                <Square className="w-4 h-4 opacity-80 shrink-0 mt-0.5" />
+                              )}
+                              <span className={`text-xs sm:text-sm leading-relaxed break-words ${parsed.isTaskChecked ? 'line-through opacity-75' : 'font-medium'}`}>
+                                {renderFormattedText(parsed.cleanTaskText)}
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words">
+                              {renderFormattedText(parsed.mainText)}
+                            </p>
+                          )}
+
+                          <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${isMe ? 'text-blue-100' : 'opacity-60'}`}>
+                            {isPinned && <Pin className="w-3 h-3 text-amber-300 mr-0.5" />}
+                            <span>{msg.time}</span>
+                            {isMe && <CheckCheck className="w-3.5 h-3.5" />}
+                          </div>
+                        </div>
+
+                        {/* Acciones rápidas del mensaje: Responder y Fijar */}
+                        <div className="flex items-center gap-0.5 opacity-70 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <button
+                            onClick={() => handleStartReply(msg)}
+                            className={`p-1.5 rounded-lg border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-white border-slate-200 text-slate-600'}`}
+                            title="Responder mensaje"
+                          >
+                            <Reply className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleTogglePin(msg)}
+                            className={`p-1.5 rounded-lg border ${
+                              isPinned
+                                ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
+                                : darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-amber-400' : 'bg-white border-slate-200 text-slate-600'
+                            }`}
+                            title={isPinned ? 'Desfijar mensaje' : 'Fijar mensaje en el canal'}
+                          >
+                            <Pin className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     )}
@@ -925,13 +1155,41 @@ export default function App() {
             </div>
           )}
 
-          {/* Barra de Entrada */}
+          {/* PREVISUALIZACIÓN DE RESPUESTA CITADA */}
+          {replyingTo && (
+            <div className={`px-4 py-2 border-t flex items-center justify-between text-xs shrink-0 ${
+              darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+            }`}>
+              <div className="flex items-center gap-2 truncate">
+                <Reply className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span className="font-bold text-blue-400">Respondiendo a {replyingTo.sender}:</span>
+                <span className="truncate opacity-80">{(replyingTo.text || '').replace(/^❝ [^\n]+\n/, '')}</span>
+              </div>
+              <button onClick={() => setReplyingTo(null)} className="text-slate-400 hover:text-white ml-2">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Barra de Entrada con botón de Checklist (☑️) */}
           <div className={`p-2.5 sm:p-4 border-t ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <label className={`p-2.5 sm:p-3 rounded-xl border cursor-pointer shrink-0 ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`}>
+              <label className={`p-2.5 sm:p-3 rounded-xl border cursor-pointer shrink-0 ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`} title="Adjuntar archivo">
                 <Paperclip className="w-4 h-4" />
                 <input type="file" onChange={handleFileUpload} className="hidden" />
               </label>
+
+              <button 
+                onClick={insertTaskTemplate}
+                className={`p-2.5 sm:p-3 rounded-xl border transition-colors shrink-0 ${
+                  inputText.startsWith('[ ] ')
+                    ? 'bg-emerald-600 border-emerald-500 text-white'
+                    : darkMode ? 'border-slate-800 bg-slate-800 text-emerald-400 hover:bg-slate-700' : 'border-slate-200 bg-slate-100 text-emerald-600'
+                }`}
+                title="Crear tarea / checklist interactivo"
+              >
+                <CheckSquare className="w-4 h-4" />
+              </button>
 
               <button 
                 onClick={triggerPoke}
@@ -943,8 +1201,9 @@ export default function App() {
               
               <div className={`flex-1 flex items-center rounded-xl border px-3 py-2.5 ${darkMode ? 'bg-slate-950 border-slate-800 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
                 <input 
+                  ref={inputRef}
                   type="text" 
-                  placeholder={`Mensaje en #${activeChannel?.name || 'canal'}...`}
+                  placeholder={`Mensaje o @mención en #${activeChannel?.name || 'canal'}...`}
                   value={inputText}
                   onChange={(e) => handleInputTyping(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage('text')}
