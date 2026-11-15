@@ -3,104 +3,756 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="NEFA Software">
-  <title>NEFA Software · iPad</title>
-  <link rel="apple-touch-icon" href="/ipad/icon.png">
-  <link rel="icon" type="image/png" href="/ipad/icon.png">
-  <link rel="stylesheet" href="/ipad/app.css">
-</head>
-<body>
-  <!-- BANNER DE ERROR VISIBLE -->
-  <div id="error-banner" class="error-banner hidden"></div>
+  <title>NEFA Software Chat</title>
+  <style>
+    * { box-sizing: border-box; -webkit-box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; -webkit-text-size-adjust: 100%; }
+    
+    body.dark { background: #020617; color: #f1f5f9; }
+    body.light { background: #f8fafc; color: #0f172a; }
+    
+    button, input, select { font: inherit; outline: none; }
+    .hidden { display: none !important; }
 
-  <!-- LOGIN -->
-  <section id="login" class="login-screen">
+    /* BANNER ERROR */
+    .error-banner { position: fixed; top: 0; left: 0; right: 0; background: #dc2626; color: #fff; padding: 10px 16px; font-size: 12px; font-weight: bold; z-index: 9999; display: -webkit-flex; display: flex; -webkit-justify-content: space-between; justify-content: space-between; -webkit-align-items: center; align-items: center; }
+
+    /* LOGIN MODERNO */
+    .login-screen { width: 100%; height: 100%; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; padding: 16px; background: #020617; color: #f1f5f9; }
+    .login-card { width: 100%; max-width: 420px; background: #0f172a; border: 1px solid #1e293b; border-radius: 20px; padding: 32px 28px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); text-align: center; }
+    .logo-box { width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #2563eb, #06b6d4); display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; color: #fff; font-size: 26px; font-weight: bold; margin-bottom: 14px; box-shadow: 0 10px 20px rgba(37,99,235,0.3); }
+    .login-card h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+    .login-card p { font-size: 12px; color: #94a3b8; margin-bottom: 24px; }
+    .login-card label { display: block; text-align: left; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px; }
+    .login-card input { width: 100%; background: #020617; border: 1px solid #1e293b; border-radius: 12px; padding: 13px 16px; color: #fff; font-size: 14px; margin-bottom: 18px; }
+    .login-card input:focus { border-color: #3b82f6; }
+    .btn-login { width: 100%; background: #2563eb; color: #fff; border: 0; border-radius: 12px; padding: 14px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 16px rgba(37,99,235,0.25); }
+
+    /* LAYOUT PRINCIPAL */
+    .app-wrap { width: 100%; height: 100%; display: -webkit-flex; display: flex; position: relative; overflow: hidden; }
+    .backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 30; }
+
+    /* SIDEBAR */
+    .sidebar { width: 310px; height: 100%; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; border-right: 1px solid #1e293b; background: #0f172a; z-index: 40; -webkit-flex-shrink: 0; flex-shrink: 0; transition: transform 0.2s ease, -webkit-transform 0.2s ease; }
+    body.light .sidebar { background: #ffffff; border-right-color: #e2e8f0; }
+
+    .sb-header { padding: 14px 16px; border-bottom: 1px solid #1e293b; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; }
+    body.light .sb-header { border-bottom-color: #e2e8f0; }
+    .brand { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
+    .brand-icon { width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(135deg, #2563eb, #06b6d4); color: #fff; font-weight: bold; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; margin-right: 10px; }
+    .brand-title { font-size: 14px; font-weight: 700; }
+    .brand-sub { font-size: 10px; color: #10b981; margin-top: 2px; }
+
+    .icon-btn { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; width: 35px; height: 35px; border-radius: 10px; cursor: pointer; display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; font-size: 14px; }
+    body.light .icon-btn { background: #f1f5f9; border-color: #cbd5e1; color: #334155; }
+    .mobile-only { display: none; }
+
+    .sb-scroll { -webkit-flex: 1; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 10px; }
+
+    .sb-section { padding: 12px 14px 6px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; font-size: 10.5px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px; }
+    .btn-add-ch { background: #2563eb; color: #fff; border: 0; border-radius: 8px; padding: 4px 9px; font-size: 11px; font-weight: 600; cursor: pointer; }
+
+    .new-ch-box { margin: 0 12px 10px; padding: 12px; background: #020617; border: 1px solid #1e293b; border-radius: 12px; }
+    body.light .new-ch-box { background: #f8fafc; border-color: #cbd5e1; }
+    .new-ch-box input { width: 100%; background: transparent; border: 1px solid #334155; color: inherit; padding: 7px 10px; border-radius: 8px; font-size: 12px; margin-bottom: 8px; }
+    .new-ch-actions { text-align: right; }
+    .new-ch-actions button { padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; border: 0; margin-left: 6px; }
+
+    .ch-list { padding: 2px 12px; }
+    .ch-item { padding: 9px 11px; border-radius: 11px; margin-bottom: 3px; cursor: pointer; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; color: #cbd5e1; border: 1px solid transparent; }
+    body.light .ch-item { color: #334155; }
+    .ch-item:hover { background: rgba(148,163,184,0.1); }
+    .ch-item.active { background: rgba(37,99,235,0.18); color: #60a5fa; border-color: rgba(59,130,246,0.35); }
+    body.light .ch-item.active { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .ch-info { overflow: hidden; padding-right: 8px; }
+    .ch-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ch-desc { font-size: 10px; opacity: 0.65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+    .ch-btns button { background: transparent; border: 0; color: inherit; opacity: 0.6; cursor: pointer; padding: 3px 5px; font-size: 11px; border-radius: 6px; }
+    .ch-btns button:hover { opacity: 1; background: rgba(148,163,184,0.2); }
+
+    /* LISTA DE PRESENCIA MSN */
+    .presence-list { padding: 2px 12px; }
+    .user-presence-item { padding: 7px 10px; border-radius: 10px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-bottom: 3px; }
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; margin-right: 9px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    .dot-online { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.6); }
+    .dot-away { background: #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.5); }
+    .dot-busy { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.5); }
+    .dot-offline { background: #64748b; opacity: 0.5; }
+    .up-info { overflow: hidden; -webkit-flex: 1; flex: 1; }
+    .up-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .up-custom { font-size: 10px; color: #94a3b8; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* FOOTER PERFIL ESTILO MSN */
+    .sb-footer { padding: 12px 14px; border-top: 1px solid #1e293b; background: rgba(2,6,23,0.4); }
+    body.light .sb-footer { border-top-color: #e2e8f0; background: #f8fafc; }
+    .sb-footer-top { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; margin-bottom: 8px; }
+    .user-box { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; overflow: hidden; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; background: #2563eb; color: #fff; font-size: 12px; font-weight: bold; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; margin-right: 9px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    .u-name { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .u-custom-msg { font-size: 10px; color: #60a5fa; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+    .btn-logout { background: transparent; border: 0; color: #f87171; font-size: 11px; cursor: pointer; text-decoration: underline; }
+    .msn-controls { display: -webkit-flex; display: flex; gap: 6px; }
+    .status-select { -webkit-flex: 1; flex: 1; background: #0f172a; border: 1px solid #334155; color: inherit; font-size: 11px; padding: 5px 8px; border-radius: 8px; cursor: pointer; }
+    body.light .status-select { background: #fff; border-color: #cbd5e1; }
+    .btn-status-msg { background: #1e293b; border: 1px solid #334155; color: inherit; font-size: 11px; padding: 5px 8px; border-radius: 8px; cursor: pointer; }
+    body.light .btn-status-msg { background: #fff; border-color: #cbd5e1; }
+
+    /* CHAT PRINCIPAL */
+    .chat-main { -webkit-flex: 1; flex: 1; height: 100%; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; overflow: hidden; }
+    .chat-top { height: 58px; padding: 0 16px; border-bottom: 1px solid #1e293b; background: #0f172a; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    body.light .chat-top { background: #ffffff; border-bottom-color: #e2e8f0; }
+    .top-left { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; overflow: hidden; }
+    .top-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .top-desc { font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .top-actions { display: -webkit-flex; display: flex; gap: 8px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+
+    .msg-area { -webkit-flex: 1; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; }
+    .msg-row { display: block; clear: both; margin-bottom: 12px; max-width: 82%; float: left; }
+    .msg-row.me { float: right; text-align: right; }
+    .msg-sender { display: block; font-size: 11px; font-weight: 700; color: #60a5fa; margin-bottom: 3px; margin-left: 4px; }
+    .msg-bubble { display: inline-block; padding: 10px 14px; border-radius: 16px; border-bottom-left-radius: 3px; background: #0f172a; border: 1px solid #1e293b; color: #f1f5f9; font-size: 13.5px; line-height: 1.45; text-align: left; word-wrap: break-word; }
+    body.light .msg-bubble { background: #ffffff; border-color: #e2e8f0; color: #0f172a; }
+    .msg-row.me .msg-bubble { background: #2563eb; border-color: #2563eb; color: #ffffff; border-bottom-left-radius: 16px; border-bottom-right-radius: 3px; }
+    .msg-time { display: block; font-size: 10px; opacity: 0.7; margin-top: 4px; text-align: right; }
+
+    .center-event { clear: both; width: 100%; text-align: center; margin: 12px 0; float: left; }
+    .poke-badge { display: inline-block; background: rgba(245,158,11,0.18); border: 2px solid #f59e0b; color: #fbbf24; padding: 8px 16px; border-radius: 14px; font-size: 12px; font-weight: 800; }
+    body.light .poke-badge { color: #b45309; }
+    .call-badge { display: inline-block; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.45); color: #34d399; padding: 12px 16px; border-radius: 16px; font-size: 12px; text-align: left; }
+    body.light .call-badge { color: #047857; }
+    .btn-join { margin-top: 8px; background: #10b981; color: #020617; border: 0; padding: 7px 14px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; display: inline-block; }
+
+    /* INDICADOR ESCRIBIENDO */
+    .typing-bar { height: 22px; padding: 0 18px; font-size: 11px; color: #60a5fa; font-style: italic; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; background: transparent; -webkit-flex-shrink: 0; flex-shrink: 0; }
+
+    /* INPUT BAR */
+    .input-bar { padding: 10px 16px 12px; border-top: 1px solid #1e293b; background: #0f172a; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    body.light .input-bar { background: #ffffff; border-top-color: #e2e8f0; }
+    .btn-buzz { background: #f59e0b; color: #020617; border: 0; width: 42px; height: 42px; border-radius: 12px; font-size: 18px; cursor: pointer; margin-right: 8px; -webkit-flex-shrink: 0; flex-shrink: 0; font-weight: bold; }
+    .btn-clip { margin-right: 8px; -webkit-flex-shrink: 0; flex-shrink: 0; width: 42px; height: 42px; border-radius: 12px; }
+    .text-input { -webkit-flex: 1; flex: 1; height: 42px; background: #020617; border: 1px solid #1e293b; border-radius: 12px; padding: 0 14px; color: inherit; font-size: 14px; margin-right: 8px; }
+    body.light .text-input { background: #f8fafc; border-color: #cbd5e1; }
+    .btn-send { background: #2563eb; color: #fff; border: 0; height: 42px; padding: 0 18px; border-radius: 12px; font-weight: 600; font-size: 13px; cursor: pointer; -webkit-flex-shrink: 0; flex-shrink: 0; }
+
+    /* MODAL VIDEOLLAMADA */
+    .call-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #020617; z-index: 100; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; }
+    .call-top { height: 54px; padding: 0 16px; background: #0f172a; border-bottom: 1px solid #1e293b; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; color: #fff; font-size: 13px; font-weight: 700; }
+    .btn-hangup { background: #dc2626; color: #fff; border: 0; padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .call-frame { -webkit-flex: 1; flex: 1; width: 100%; height: 100%; background: #000; }
+    .call-frame iframe { width: 100%; height: 100%; border: 0; }
+
+    @media (max-width: 768px) {
+      .sidebar { position: fixed; top: 0; left: 0; bottom: 0; -webkit-transform: translateX(-100%); transform: translateX(-100%); }
+      .sidebar.open { -webkit-transform: translateX(0); transform: translateX(0); }
+      .mobile-only { display: -webkit-inline-flex; display: inline-flex; }
+    }
+
+    @-webkit-keyframes msn-shake {
+      0%, 100% { -webkit-transform: translate(0, 0) rotate(0deg); }
+      10%, 50% { -webkit-transform: translate(-16px, -12px) rotate(-2.5deg); }
+      20%, 60% { -webkit-transform: translate(16px, 12px) rotate(2.5deg); }
+      30%, 70% { -webkit-transform: translate(-16px, 10px) rotate(-2deg); }
+      40%, 80% { -webkit-transform: translate(16px, -10px) rotate(2deg); }
+      90% { -webkit-transform: translate(-6px, 4px) rotate(-0.5deg); }
+    }
+    @keyframes msn-shake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      10%, 50% { transform: translate(-16px, -12px) rotate(-2.5deg); }
+      20%, 60% { transform: translate(16px, 12px) rotate(2.5deg); }
+      30%, 70% { transform: translate(-16px, 10px) rotate(-2deg); }
+      40%, 80% { transform: translate(16px, -10px) rotate(2deg); }
+      90% { transform: translate(-6px, 4px) rotate(-0.5deg); }
+    }
+    .msn-buzz { -webkit-animation: msn-shake 0.8s both; animation: msn-shake 0.8s both; }
+  </style>
+</head>
+<body class="dark">
+  <div id="err-bar" class="error-banner hidden">
+    <span id="err-txt"></span>
+    <button onclick="document.getElementById('err-bar').className='error-banner hidden'" style="background:transparent;border:0;color:#fff;text-decoration:underline;cursor:pointer">Cerrar</button>
+  </div>
+
+  <!-- PANTALLA LOGIN -->
+  <div id="login-view" class="login-screen">
     <div class="login-card">
-      <div class="logo-icon">N</div>
-      <h1>NEFA Software</h1>
-      <p class="subtitle">Ingresa tu nombre para conectar con el equipo en vivo</p>
+      <div class="logo-box">⚡</div>
+      <h1>NEFA Software Chat</h1>
+      <p>Ingresa tu nombre para conectarte en vivo con el equipo</p>
       <form id="login-form">
         <label>Tu Nombre:</label>
-        <input id="username" type="text" placeholder="Ej. Franco, Ariel, Melany..." value="Franco Sierralta" required>
-        <button type="submit" class="btn-primary">Ingresar al Chat →</button>
+        <input id="login-input" type="text" value="Franco Sierralta" placeholder="Ej. Franco, Ariel, Melany..." required>
+        <button type="submit" class="btn-login">Entrar al Chat →</button>
       </form>
     </div>
-  </section>
+  </div>
 
-  <!-- APP PRINCIPAL -->
-  <div id="app" class="app hidden">
-    <!-- SIDEBAR -->
+  <!-- PANTALLA PRINCIPAL -->
+  <div id="app-view" class="app-wrap hidden">
+    <div id="sb-backdrop" class="backdrop hidden"></div>
+
     <aside id="sidebar" class="sidebar">
-      <div class="sidebar-header">
-        <div class="workspace-info">
-          <div class="workspace-icon">N</div>
-          <div class="workspace-text">
-            <h2>NEFA Software</h2>
-            <p>Canales en Vivo</p>
+      <div class="sb-header">
+        <div class="brand">
+          <div class="brand-icon">N</div>
+          <div>
+            <div class="brand-title">NEFA Software</div>
+            <div id="sb-online-user" class="brand-sub">● En vivo</div>
           </div>
         </div>
-        <button id="close-sidebar-btn" class="btn-mobile-close" type="button">✕</button>
+        <div>
+          <button id="sound-btn" class="icon-btn" type="button" title="Activar/Silenciar sonidos MSN">🔊</button>
+          <button id="theme-btn" class="icon-btn" type="button" title="Cambiar tema">☀️</button>
+          <button id="close-sb-btn" class="icon-btn mobile-only" type="button">✕</button>
+        </div>
       </div>
 
-      <div class="channels-bar">
-        <span>CANALES</span>
-        <button id="new-channel-btn" class="btn-new-ch" type="button">+ Nuevo</button>
-      </div>
+      <div class="sb-scroll">
+        <div class="sb-section">
+          <span>CANALES</span>
+          <button id="toggle-add-ch" class="btn-add-ch" type="button">+ Nuevo</button>
+        </div>
 
-      <div class="sidebar-list" id="sidebar-list"></div>
-
-      <div class="sidebar-footer">
-        <div class="user-info">
-          <div class="avatar-small" id="user-initials">FS</div>
-          <div class="user-meta">
-            <p id="user-display-name">Franco</p>
-            <p class="status-online">● En línea</p>
+        <div id="add-ch-box" class="new-ch-box hidden">
+          <input id="new-ch-name" type="text" placeholder="Nombre (ej. ventas)">
+          <input id="new-ch-desc" type="text" placeholder="Descripción corta">
+          <div class="new-ch-actions">
+            <button id="cancel-add-ch" type="button" style="background:transparent;color:#94a3b8">Cancelar</button>
+            <button id="save-add-ch" type="button" style="background:#2563eb;color:#fff">Crear</button>
           </div>
         </div>
-        <button id="logout-btn" class="btn-logout" type="button">Cambiar</button>
+
+        <div id="ch-list" class="ch-list"></div>
+
+        <!-- LISTA DE EQUIPO EN VIVO ESTILO MSN -->
+        <div class="sb-section" style="margin-top:8px">
+          <span>EQUIPO EN LÍNEA</span>
+          <span id="online-count" style="color:#10b981">1 activo</span>
+        </div>
+        <div id="presence-list" class="presence-list"></div>
+      </div>
+
+      <!-- FOOTER PERFIL CON ESTADO Y SUBTÍTULO MSN -->
+      <div class="sb-footer">
+        <div class="sb-footer-top">
+          <div class="user-box">
+            <div id="u-avatar" class="avatar">FS</div>
+            <div style="overflow:hidden">
+              <div id="u-name" class="u-name">Franco</div>
+              <div id="u-custom-display" class="u-custom-msg" title="Tocá para cambiar tu frase personal">✏️ Escribir frase personal...</div>
+            </div>
+          </div>
+          <button id="logout-btn" class="btn-logout" type="button">Salir</button>
+        </div>
+        <div class="msn-controls">
+          <select id="status-select" class="status-select">
+            <option value="online">🟢 Conectado</option>
+            <option value="away">🟠 Ausente (Vuelvo enseguida)</option>
+            <option value="busy">🔴 Ocupado (No molestar)</option>
+          </select>
+          <button id="edit-custom-btn" class="btn-status-msg" type="button" title="Cambiar frase MSN">💬 Frase</button>
+        </div>
       </div>
     </aside>
 
-    <!-- ÁREA DE CHAT -->
-    <main class="chat-area">
-      <header class="chat-header">
-        <div class="header-left">
-          <button id="menu-btn" class="btn-menu" type="button">☰</button>
-          <div class="chat-title">
-            <h2 id="chat-name"># general</h2>
-            <p id="chat-desc">Coordinación general del equipo</p>
+    <main class="chat-main">
+      <header class="chat-top">
+        <div class="top-left">
+          <button id="open-sb-btn" class="icon-btn mobile-only" type="button" style="margin-right:10px">☰</button>
+          <div style="overflow:hidden">
+            <div id="active-ch-name" class="top-title"># general</div>
+            <div id="active-ch-desc" class="top-desc">Coordinación general del equipo</div>
           </div>
         </div>
-        <div class="call-actions">
-          <button id="voice-call-btn" class="btn-call" type="button" title="Llamada de voz">📞</button>
-          <button id="video-call-btn" class="btn-call" type="button" title="Videollamada">📹</button>
+        <div class="top-actions">
+          <button id="btn-voice" class="icon-btn" type="button" title="Llamada de voz">📞</button>
+          <button id="btn-video" class="icon-btn" type="button" title="Videollamada">📹</button>
         </div>
       </header>
 
-      <div class="messages-container" id="messages-container"></div>
+      <div id="msg-area" class="msg-area"></div>
 
-      <div class="chat-input-area">
-        <button id="poke-btn" class="btn-poke" type="button" title="Enviar Zumbido MSN">🔔</button>
-        <input id="chat-input" type="text" placeholder="Escribe un mensaje..." autocomplete="off">
-        <button id="send-btn" class="btn-send" type="button">Enviar</button>
+      <!-- BARRA INDICADORA DE "ESCRIBIENDO..." -->
+      <div id="typing-bar" class="typing-bar"></div>
+
+      <div class="input-bar">
+        <label class="icon-btn btn-clip" title="Adjuntar archivo">
+          📎
+          <input id="file-input" type="file" style="display:none">
+        </label>
+        <button id="btn-buzz" class="btn-buzz" type="button" title="Enviar Zumbido MSN">🔔</button>
+        <input id="msg-input" class="text-input" type="text" placeholder="Escribe un mensaje..." autocomplete="off">
+        <button id="btn-send" class="btn-send" type="button">Enviar</button>
       </div>
     </main>
   </div>
 
-  <!-- MODAL DE LLAMADA / VIDEOLLAMADA -->
+  <!-- SALA DE LLAMADA JITSI -->
   <div id="call-modal" class="call-modal hidden">
-    <div class="call-modal-header">
-      <span id="call-modal-title">● Sala en vivo</span>
+    <div class="call-top">
+      <span id="call-title">● Sala en vivo</span>
       <div>
-        <a id="call-external-link" href="#" target="_blank" class="btn-ext-call">Abrir en pestaña</a>
-        <button id="close-call-btn" class="btn-hangup" type="button">Salir de la Sala</button>
+        <a id="call-ext" href="#" target="_blank" style="color:#60a5fa;margin-right:14px;font-size:12px">Abrir en ventana</a>
+        <button id="btn-hangup" class="btn-hangup" type="button">Salir de la Sala</button>
       </div>
     </div>
-    <div id="call-iframe-wrap" class="call-iframe-wrap"></div>
+    <div id="call-frame" class="call-frame"></div>
   </div>
 
-  <script src="/ipad/app.js"></script>
+  <script>
+    (function () {
+      var SB_URL = 'https://fedzgvgobjeokxfhvmok.supabase.co';
+      var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlZHpndmdvYmplb2t4Zmh2bW9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1MzE4OTksImV4cCI6MjExMDEwNzg5OX0.tnxHWDOWQySJ8VDIQhYX5hmVHGvJCD7UlMrw7XeI2ZY';
+
+      var state = {
+        user: '', chatId: 'gen-1', channels: [], presence: [],
+        myStatus: 'online', myCustom: '', isTyping: false, lastTypedAt: 0,
+        lastMsgId: null, timer: null, titleTimer: null, dark: true, soundEnabled: true
+      };
+
+      function el(id) { return document.getElementById(id); }
+      function show(id, yes) { el(id).className = el(id).className.replace(/\s*hidden\b/g, '') + (yes ? '' : ' hidden'); }
+      function setErr(m) { if (!m) { show('err-bar', false); return; } el('err-txt').textContent = m; show('err-bar', true); }
+      function nowTime() { var d = new Date(), h = d.getHours(), m = d.getMinutes(); return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m); }
+
+      function api(method, path, body, headersExtra, cb) {
+        var x = new XMLHttpRequest();
+        x.open(method, SB_URL + '/rest/v1/' + path, true);
+        x.setRequestHeader('apikey', SB_KEY);
+        x.setRequestHeader('Authorization', 'Bearer ' + SB_KEY);
+        x.setRequestHeader('Content-Type', 'application/json');
+        if (headersExtra) {
+          for (var k in headersExtra) x.setRequestHeader(k, headersExtra[k]);
+        } else if (method !== 'GET') {
+          x.setRequestHeader('Prefer', 'return=representation');
+        }
+        x.onreadystatechange = function () {
+          if (x.readyState === 4) {
+            if (x.status >= 200 && x.status < 300) {
+              var d = null; try { d = x.responseText ? JSON.parse(x.responseText) : null; } catch (e) {}
+              if (cb) cb(null, d);
+            } else {
+              var msg = 'HTTP ' + x.status;
+              try { var j = JSON.parse(x.responseText); if (j && j.message) msg = j.message; } catch (e) {}
+              if (cb) cb(msg, null);
+            }
+          }
+        };
+        x.send(body ? JSON.stringify(body) : null);
+      }
+
+      // Sonido Clásico MSN al recibir mensaje de texto ("Tuc-tuc-tín")
+      function playMsnMessageSound() {
+        if (!state.soundEnabled || state.myStatus === 'busy') return;
+        try {
+          var Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) return;
+          var c = new Ctx();
+          var notes = [
+            { f: 587.33, t: 0, d: 0.09 },
+            { f: 880.0, t: 0.10, d: 0.09 },
+            { f: 1174.66, t: 0.20, d: 0.22 }
+          ];
+          for (var i = 0; i < notes.length; i++) {
+            (function (n) {
+              var o = c.createOscillator(), g = c.createGain();
+              o.type = 'sine'; o.frequency.value = n.f;
+              g.gain.setValueAtTime(0.18, c.currentTime + n.t);
+              g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + n.t + n.d);
+              o.connect(g); g.connect(c.destination);
+              o.start(c.currentTime + n.t); o.stop(c.currentTime + n.t + n.d);
+            })(notes[i]);
+          }
+        } catch (e) {}
+      }
+
+      // Pestaña parpadeante estilo MSN cuando estás en otra ventana
+      function flashTabTitle(senderName) {
+        if (state.titleTimer) clearInterval(state.titleTimer);
+        var toggle = false;
+        state.titleTimer = setInterval(function () {
+          document.title = toggle ? 'NEFA Software Chat' : '💬 ¡Mensaje de ' + senderName + '!';
+          toggle = !toggle;
+        }, 900);
+      }
+
+      window.onfocus = function () {
+        if (state.titleTimer) {
+          clearInterval(state.titleTimer);
+          state.titleTimer = null;
+          document.title = 'NEFA Software Chat';
+        }
+      };
+
+      function buzzEffect() {
+        var b = document.body;
+        b.className = b.className.replace(/\s*msn-buzz\b/g, '');
+        setTimeout(function () { b.className += ' msn-buzz'; }, 20);
+        setTimeout(function () { b.className = b.className.replace(/\s*msn-buzz\b/g, ''); }, 900);
+        if (navigator.vibrate) navigator.vibrate([120, 40, 120, 40, 220]);
+        if (!state.soundEnabled) return;
+        try {
+          var Ctx = window.AudioContext || window.webkitAudioContext;
+          if (Ctx) {
+            var c = new Ctx(), ts = [0, 0.08, 0.16, 0.24, 0.32, 0.40, 0.48];
+            for (var i = 0; i < ts.length; i++) {
+              (function (t, idx) {
+                var o = c.createOscillator(), g = c.createGain();
+                o.type = 'sawtooth'; o.frequency.value = (idx % 2 === 0) ? 340 : 460;
+                g.gain.value = 0.16; o.connect(g); g.connect(c.destination);
+                o.start(c.currentTime + t); o.stop(c.currentTime + t + 0.06);
+              })(ts[i], i);
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Sincronizar Presencia y "Escribiendo..." con Supabase
+      function syncPresence(typingChannel) {
+        if (!state.user) return;
+        var typingVal = (typeof typingChannel === 'string') ? typingChannel : (state.isTyping ? state.chatId : '');
+        var payload = {
+          username: state.user,
+          status: state.myStatus,
+          custom_status: state.myCustom,
+          typing_in: typingVal,
+          typing_at: new Date().toISOString(),
+          last_seen: new Date().toISOString()
+        };
+        api('POST', 'presence', [payload], { 'Prefer': 'resolution=merge-duplicates' }, function () {
+          api('GET', 'presence?select=*&order=username.asc', null, null, function (err, list) {
+            if (!err && list) {
+              state.presence = list;
+              renderPresence();
+            }
+          });
+        });
+      }
+
+      function renderPresence() {
+        var box = el('presence-list');
+        box.innerHTML = '';
+        var now = new Date().getTime();
+        var activeCount = 0;
+        var typingUsers = [];
+
+        for (var i = 0; i < state.presence.length; i++) {
+          var p = state.presence[i];
+          var seenDiff = now - new Date(p.last_seen).getTime();
+          var isOnline = seenDiff < 40000;
+          if (isOnline) activeCount++;
+
+          // Detectar si está escribiendo en este canal hace menos de 6 segundos
+          var typeDiff = now - new Date(p.typing_at).getTime();
+          if (isOnline && p.typing_in === state.chatId && typeDiff < 6000 && p.username.toLowerCase() !== state.user.toLowerCase()) {
+            typingUsers.push(p.username);
+          }
+
+          var row = document.createElement('div');
+          row.className = 'user-presence-item';
+          var dot = document.createElement('span');
+          var stClass = !isOnline ? 'dot-offline' : (p.status === 'away' ? 'dot-away' : (p.status === 'busy' ? 'dot-busy' : 'dot-online'));
+          dot.className = 'status-dot ' + stClass;
+          row.appendChild(dot);
+
+          var info = document.createElement('div');
+          info.className = 'up-info';
+          var nm = document.createElement('div');
+          nm.className = 'up-name';
+          var labelStatus = !isOnline ? ' (Desconectado)' : (p.status === 'away' ? ' (Ausente)' : (p.status === 'busy' ? ' (Ocupado)' : ''));
+          nm.textContent = p.username + labelStatus;
+          info.appendChild(nm);
+
+          if (p.custom_status) {
+            var cs = document.createElement('div');
+            cs.className = 'up-custom';
+            cs.textContent = '“' + p.custom_status + '”';
+            info.appendChild(cs);
+          }
+          row.appendChild(info);
+          box.appendChild(row);
+        }
+
+        el('online-count').textContent = activeCount + (activeCount === 1 ? ' activo' : ' activos');
+        el('typing-bar').textContent = typingUsers.length > 0 ? ('💬 ' + typingUsers.join(', ') + ' está escribiendo...') : '';
+      }
+
+      function toggleSidebar(open) {
+        var sb = el('sidebar');
+        sb.className = sb.className.replace(/\s*open\b/g, '') + (open ? ' open' : '');
+        show('sb-backdrop', open);
+      }
+
+      function getActiveCh() {
+        for (var i = 0; i < state.channels.length; i++) {
+          if (String(state.channels[i].id) === String(state.chatId)) return state.channels[i];
+        }
+        return null;
+      }
+
+      function renderChannels() {
+        var box = el('ch-list'); box.innerHTML = '';
+        for (var i = 0; i < state.channels.length; i++) {
+          (function (ch) {
+            var item = document.createElement('div');
+            item.className = 'ch-item' + (String(ch.id) === String(state.chatId) ? ' active' : '');
+            var info = document.createElement('div'); info.className = 'ch-info';
+            var nm = document.createElement('div'); nm.className = 'ch-name'; nm.textContent = '# ' + ch.name;
+            var ds = document.createElement('div'); ds.className = 'ch-desc'; ds.textContent = ch.description || '';
+            info.appendChild(nm); if (ch.description) info.appendChild(ds);
+            item.appendChild(info);
+
+            var btns = document.createElement('div'); btns.className = 'ch-btns';
+            var eb = document.createElement('button'); eb.type = 'button'; eb.textContent = '✎';
+            eb.onclick = function (e) {
+              e.stopPropagation();
+              var n = prompt('Nombre del canal:', ch.name);
+              if (!n || !n.replace(/^\s+|\s+$/g, '')) return;
+              var d = prompt('Descripción:', ch.description || '');
+              api('PATCH', 'channels?id=eq.' + encodeURIComponent(ch.id), {
+                name: n.replace(/^\s+|\s+$/g, '').toLowerCase().replace(/\s+/g, '-'),
+                description: d !== null ? d : ch.description
+              }, null, function () { loadChannels(); });
+            };
+            btns.appendChild(eb);
+
+            if (state.channels.length > 1) {
+              var db = document.createElement('button'); db.type = 'button'; db.textContent = '🗑';
+              db.onclick = function (e) {
+                e.stopPropagation();
+                if (!confirm('¿Eliminar #' + ch.name + '?')) return;
+                api('DELETE', 'channels?id=eq.' + encodeURIComponent(ch.id), null, null, function () { loadChannels(true); });
+              };
+              btns.appendChild(db);
+            }
+            item.appendChild(btns);
+            item.onclick = function () {
+              state.chatId = ch.id; state.lastMsgId = null;
+              toggleSidebar(false); renderChannels(); updateHeader(); loadMessages(true);
+            };
+            box.appendChild(item);
+          })(state.channels[i]);
+        }
+      }
+
+      function updateHeader() {
+        var c = getActiveCh();
+        el('active-ch-name').textContent = '# ' + (c ? c.name : 'general');
+        el('active-ch-desc').textContent = c ? (c.description || 'Canal en vivo') : '';
+      }
+
+      function loadChannels(reloadMsgs) {
+        api('GET', 'channels?select=*&order=created_at.asc', null, null, function (err, data) {
+          if (!err && data && data.length > 0) {
+            state.channels = data;
+            if (!getActiveCh()) state.chatId = data[0].id;
+            renderChannels(); updateHeader();
+            if (reloadMsgs) loadMessages(true);
+          }
+        });
+      }
+
+      function loadMessages(initial) {
+        if (!state.chatId) return;
+        api('GET', 'messages?select=*&channel_id=eq.' + encodeURIComponent(state.chatId) + '&order=created_at.asc', null, null, function (err, data) {
+          if (!err && data) {
+            if (data.length > 0) {
+              var last = data[data.length - 1];
+              if (!initial && state.lastMsgId && state.lastMsgId !== last.id) {
+                var fromOther = last.sender.toLowerCase() !== state.user.toLowerCase();
+                if (fromOther) {
+                  if (last.type === 'poke') {
+                    buzzEffect();
+                  } else {
+                    playMsnMessageSound();
+                  }
+                  flashTabTitle(last.sender);
+                }
+              }
+              state.lastMsgId = last.id;
+            }
+            renderMessages(data);
+          }
+        });
+      }
+
+      function renderMessages(list) {
+        var area = el('msg-area');
+        var nearBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) < 90;
+        area.innerHTML = '';
+        for (var i = 0; i < list.length; i++) {
+          var m = list[i], me = m.sender && m.sender.toLowerCase() === state.user.toLowerCase();
+          if (m.type === 'poke') {
+            var ce = document.createElement('div'); ce.className = 'center-event';
+            var pb = document.createElement('div'); pb.className = 'poke-badge';
+            pb.textContent = '🔔 ¡' + m.sender + ' ha enviado un Zumbido! ⚡ (' + (m.time || '') + ')';
+            ce.appendChild(pb); area.appendChild(ce);
+          } else if (m.type === 'call') {
+            var cc = document.createElement('div'); cc.className = 'center-event';
+            var cb = document.createElement('div'); cb.className = 'call-badge';
+            var st = document.createElement('div'); st.style.fontWeight = 'bold';
+            st.textContent = m.sender + ' ' + (m.text || 'inició una llamada') + ' (' + (m.time || '') + ')';
+            var jb = document.createElement('button'); jb.className = 'btn-join'; jb.textContent = 'Unirse a la Sala';
+            jb.onclick = function () { startCall('video', false); };
+            cb.appendChild(st); cb.appendChild(jb); cc.appendChild(cb); area.appendChild(cc);
+          } else {
+            var row = document.createElement('div'); row.className = 'msg-row' + (me ? ' me' : '');
+            if (!me) {
+              var sn = document.createElement('span'); sn.className = 'msg-sender'; sn.textContent = m.sender;
+              row.appendChild(sn);
+            }
+            var bb = document.createElement('div'); bb.className = 'msg-bubble'; bb.textContent = m.text || '';
+            if (m.time) {
+              var tm = document.createElement('span'); tm.className = 'msg-time'; tm.textContent = m.time + (me ? ' ✓✓' : '');
+              bb.appendChild(tm);
+            }
+            row.appendChild(bb); area.appendChild(row);
+          }
+        }
+        if (nearBottom) area.scrollTop = area.scrollHeight;
+      }
+
+      function sendMsg(txt, type) {
+        state.isTyping = false;
+        var msg = {
+          id: 'msg-' + new Date().getTime() + '-' + Math.floor(Math.random() * 9999),
+          channel_id: state.chatId, sender: state.user, text: txt, time: nowTime(), type: type || 'text'
+        };
+        state.lastMsgId = msg.id;
+        api('POST', 'messages', [msg], null, function (err) {
+          if (!err) {
+            loadMessages(false);
+            syncPresence('');
+          } else {
+            setErr('No se pudo enviar: ' + err);
+          }
+        });
+      }
+
+      function startCall(mode, announce) {
+        var room = 'NEFA_Software_Room_' + String(state.chatId).replace(/[^a-zA-Z0-9]/g, '_');
+        var url = 'https://meet.jit.si/' + room + '#userInfo.displayName="' + encodeURIComponent(state.user) + '"&config.prejoinPageEnabled=false&config.startWithVideoMuted=' + (mode === 'voice');
+        var ch = getActiveCh();
+        el('call-title').textContent = '● Sala en vivo: #' + (ch ? ch.name : 'general');
+        el('call-ext').href = url;
+        el('call-frame').innerHTML = '<iframe src="' + url + '" allow="camera; microphone; fullscreen; display-capture; autoplay"></iframe>';
+        show('call-modal', true);
+        if (announce) sendMsg('📞 Inició una ' + (mode === 'video' ? 'Videollamada' : 'Llamada de voz') + ' en vivo', 'call');
+      }
+
+      function promptCustomMessage() {
+        var val = prompt('Escribí tu frase personal estilo MSN (ej. Cotizando flete / En reunión):', state.myCustom || '');
+        if (val !== null) {
+          state.myCustom = val.replace(/^\s+|\s+$/g, '');
+          try { localStorage.setItem('nefa_custom_msg', state.myCustom); } catch (e) {}
+          el('u-custom-display').textContent = state.myCustom ? ('“' + state.myCustom + '”') : '✏️ Escribir frase personal...';
+          syncPresence();
+        }
+      }
+
+      function enterApp(name) {
+        state.user = name;
+        try {
+          localStorage.setItem('nefa_username', name);
+          state.myCustom = localStorage.getItem('nefa_custom_msg') || '';
+          state.myStatus = localStorage.getItem('nefa_status') || 'online';
+        } catch (e) {}
+
+        el('u-name').textContent = name;
+        el('sb-online-user').textContent = '● En vivo (' + name + ')';
+        el('u-avatar').textContent = name.substring(0, 2).toUpperCase();
+        el('status-select').value = state.myStatus;
+        el('u-custom-display').textContent = state.myCustom ? ('“' + state.myCustom + '”') : '✏️ Escribir frase personal...';
+
+        show('login-view', false); show('app-view', true);
+        loadChannels(true);
+        syncPresence();
+
+        if (state.timer) clearInterval(state.timer);
+        state.timer = setInterval(function () {
+          if (state.isTyping && (new Date().getTime() - state.lastTypedAt > 4000)) {
+            state.isTyping = false;
+          }
+          loadMessages(false);
+          loadChannels(false);
+          syncPresence();
+        }, 2200);
+      }
+
+      el('login-form').onsubmit = function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        var v = el('login-input').value.replace(/^\s+|\s+$/g, '');
+        if (v) enterApp(v);
+        return false;
+      };
+      el('logout-btn').onclick = function () {
+        try { localStorage.removeItem('nefa_username'); } catch (e) {}
+        if (state.timer) clearInterval(state.timer);
+        show('app-view', false); show('login-view', true);
+      };
+      el('status-select').onchange = function () {
+        state.myStatus = el('status-select').value;
+        try { localStorage.setItem('nefa_status', state.myStatus); } catch (e) {}
+        syncPresence();
+      };
+      el('edit-custom-btn').onclick = promptCustomMessage;
+      el('u-custom-display').onclick = promptCustomMessage;
+
+      el('sound-btn').onclick = function () {
+        state.soundEnabled = !state.soundEnabled;
+        el('sound-btn').textContent = state.soundEnabled ? '🔊' : '🔇';
+      };
+      el('theme-btn').onclick = function () {
+        state.dark = !state.dark;
+        document.body.className = state.dark ? 'dark' : 'light';
+        el('theme-btn').textContent = state.dark ? '☀️' : '🌙';
+      };
+      el('open-sb-btn').onclick = function () { toggleSidebar(true); };
+      el('close-sb-btn').onclick = function () { toggleSidebar(false); };
+      el('sb-backdrop').onclick = function () { toggleSidebar(false); };
+      el('toggle-add-ch').onclick = function () { show('add-ch-box', true); };
+      el('cancel-add-ch').onclick = function () { show('add-ch-box', false); };
+      el('save-add-ch').onclick = function () {
+        var n = el('new-ch-name').value.replace(/^\s+|\s+$/g, '');
+        if (!n) return;
+        var ch = { id: 'ch-' + new Date().getTime(), name: n.toLowerCase().replace(/\s+/g, '-'), description: el('new-ch-desc').value || 'Canal del equipo' };
+        api('POST', 'channels', [ch], null, function (err) {
+          if (!err) {
+            el('new-ch-name').value = ''; el('new-ch-desc').value = '';
+            show('add-ch-box', false); state.chatId = ch.id; loadChannels(true);
+          }
+        });
+      };
+      el('btn-send').onclick = function () {
+        var t = el('msg-input').value.replace(/^\s+|\s+$/g, '');
+        if (t) { el('msg-input').value = ''; sendMsg(t, 'text'); }
+      };
+      el('msg-input').onkeydown = function (e) {
+        if ((e.keyCode || e.which) === 13) {
+          if (e.preventDefault) e.preventDefault();
+          el('btn-send').click();
+        } else {
+          var now = new Date().getTime();
+          state.lastTypedAt = now;
+          if (!state.isTyping) {
+            state.isTyping = true;
+            syncPresence(state.chatId);
+          }
+        }
+      };
+      el('btn-buzz').onclick = function () { buzzEffect(); sendMsg('⚡ ¡Acaba de enviar un Zumbido!', 'poke'); };
+      el('file-input').onchange = function (e) {
+        var f = e.target.files && e.target.files[0];
+        if (f) sendMsg('📁 Archivo adjunto: ' + f.name + ' (' + (f.size / 1024 / 1024).toFixed(1) + ' MB)', 'file');
+      };
+      el('btn-voice').onclick = function () { startCall('voice', true); };
+      el('btn-video').onclick = function () { startCall('video', true); };
+      el('btn-hangup').onclick = function () { el('call-frame').innerHTML = ''; show('call-modal', false); };
+
+      try {
+        var saved = localStorage.getItem('nefa_username');
+        if (saved && saved.replace(/^\s+|\s+$/g, '')) enterApp(saved);
+      } catch (e) {}
+    })();
+  </script>
 </body>
 </html>
