@@ -72,7 +72,8 @@
 
     /* LISTA DE PRESENCIA MSN */
     .presence-list { padding: 2px 12px; }
-    .user-presence-item { padding: 7px 10px; border-radius: 10px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-bottom: 3px; }
+    .user-presence-item { padding: 7px 10px; border-radius: 10px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-bottom: 3px; cursor: pointer; }
+    .user-presence-item:hover { background: rgba(148,163,184,0.12); }
     .status-dot { width: 9px; height: 9px; border-radius: 50%; margin-right: 9px; -webkit-flex-shrink: 0; flex-shrink: 0; }
     .dot-online { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.6); }
     .dot-away { background: #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.5); }
@@ -104,15 +105,50 @@
     .top-left { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; overflow: hidden; }
     .top-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .top-desc { font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .top-actions { display: -webkit-flex; display: flex; gap: 8px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    .top-actions { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; gap: 6px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+
+    /* BUSCADOR RÁPIDO */
+    .search-box { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; background: #020617; border: 1px solid #334155; border-radius: 10px; padding: 4px 8px; margin-right: 4px; }
+    body.light .search-box { background: #f1f5f9; border-color: #cbd5e1; }
+    .search-box input { background: transparent; border: 0; color: inherit; font-size: 12px; width: 130px; }
+    .search-close { background: transparent; border: 0; color: #94a3b8; cursor: pointer; font-size: 12px; margin-left: 4px; }
+
+    /* BARRA DE MENSAJE FIJADO (PINNED) */
+    .pin-bar { padding: 8px 16px; background: rgba(245,158,11,0.12); border-bottom: 1px solid rgba(245,158,11,0.3); color: #fde68a; font-size: 12px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    body.light .pin-bar { background: #fffbeb; border-bottom-color: #fde68a; color: #92400e; }
+    .pin-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; }
+    .btn-unpin { background: transparent; border: 0; color: inherit; text-decoration: underline; font-size: 11px; cursor: pointer; -webkit-flex-shrink: 0; flex-shrink: 0; }
 
     .msg-area { -webkit-flex: 1; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; }
-    .msg-row { display: block; clear: both; margin-bottom: 12px; max-width: 82%; float: left; }
+    .msg-row { display: block; clear: both; margin-bottom: 14px; max-width: 88%; float: left; }
     .msg-row.me { float: right; text-align: right; }
     .msg-sender { display: block; font-size: 11px; font-weight: 700; color: #60a5fa; margin-bottom: 3px; margin-left: 4px; }
+    
+    .msg-flex { display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; gap: 6px; }
+    .msg-row.me .msg-flex { -webkit-flex-direction: row-reverse; flex-direction: row-reverse; }
+
     .msg-bubble { display: inline-block; padding: 10px 14px; border-radius: 16px; border-bottom-left-radius: 3px; background: #0f172a; border: 1px solid #1e293b; color: #f1f5f9; font-size: 13.5px; line-height: 1.45; text-align: left; word-wrap: break-word; }
     body.light .msg-bubble { background: #ffffff; border-color: #e2e8f0; color: #0f172a; }
     .msg-row.me .msg-bubble { background: #2563eb; border-color: #2563eb; color: #ffffff; border-bottom-left-radius: 16px; border-bottom-right-radius: 3px; }
+    .msg-bubble.pinned-ring { border: 2px solid #f59e0b !important; }
+
+    /* CITA DE RESPUESTA Y MENCIONES */
+    .quote-box { font-size: 11px; margin-bottom: 6px; padding: 5px 9px; border-radius: 8px; border-left: 3px solid #60a5fa; background: rgba(15,23,42,0.55); color: #cbd5e1; }
+    .msg-row.me .quote-box { background: rgba(29,78,216,0.65); border-left-color: #bfdbfe; color: #e0f2fe; }
+    .mention-tag { background: rgba(251,191,36,0.25); color: #fde047; border: 1px solid rgba(251,191,36,0.45); padding: 1px 5px; border-radius: 5px; font-weight: 700; }
+    body.light .mention-tag { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+
+    /* TAREA / CHECKLIST INTERACTIVO */
+    .task-row { display: -webkit-flex; display: flex; -webkit-align-items: flex-start; align-items: flex-start; cursor: pointer; padding: 2px 0; }
+    .task-box { font-size: 15px; margin-right: 7px; line-height: 1.2; }
+    .task-done { text-decoration: line-through; opacity: 0.75; }
+
+    /* ACCIONES RÁPIDAS DEL MENSAJE (RESPONDER / FIJAR) */
+    .msg-actions { display: -webkit-inline-flex; display: inline-flex; gap: 4px; opacity: 0.75; }
+    .act-btn { background: #0f172a; border: 1px solid #334155; color: #94a3b8; width: 28px; height: 28px; border-radius: 8px; font-size: 12px; cursor: pointer; display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
+    body.light .act-btn { background: #fff; border-color: #cbd5e1; color: #475569; }
+    .act-btn.active-pin { background: rgba(245,158,11,0.2); border-color: #f59e0b; color: #fbbf24; }
+
     .msg-time { display: block; font-size: 10px; opacity: 0.7; margin-top: 4px; text-align: right; }
 
     .center-event { clear: both; width: 100%; text-align: center; margin: 12px 0; float: left; }
@@ -122,14 +158,18 @@
     body.light .call-badge { color: #047857; }
     .btn-join { margin-top: 8px; background: #10b981; color: #020617; border: 0; padding: 7px 14px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; display: inline-block; }
 
-    /* INDICADOR ESCRIBIENDO */
-    .typing-bar { height: 22px; padding: 0 18px; font-size: 11px; color: #60a5fa; font-style: italic; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; background: transparent; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    /* INDICADOR ESCRIBIENDO Y BARRA DE RESPUESTA */
+    .typing-bar { height: 20px; padding: 0 18px; font-size: 11px; color: #60a5fa; font-style: italic; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    .reply-bar { padding: 7px 16px; background: #0f172a; border-top: 1px solid #1e293b; font-size: 11.5px; color: #cbd5e1; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    body.light .reply-bar { background: #f1f5f9; border-top-color: #cbd5e1; color: #334155; }
 
     /* INPUT BAR */
     .input-bar { padding: 10px 16px 12px; border-top: 1px solid #1e293b; background: #0f172a; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-flex-shrink: 0; flex-shrink: 0; }
     body.light .input-bar { background: #ffffff; border-top-color: #e2e8f0; }
-    .btn-buzz { background: #f59e0b; color: #020617; border: 0; width: 42px; height: 42px; border-radius: 12px; font-size: 18px; cursor: pointer; margin-right: 8px; -webkit-flex-shrink: 0; flex-shrink: 0; font-weight: bold; }
-    .btn-clip { margin-right: 8px; -webkit-flex-shrink: 0; flex-shrink: 0; width: 42px; height: 42px; border-radius: 12px; }
+    .btn-task { background: #1e293b; border: 1px solid #334155; color: #34d399; width: 42px; height: 42px; border-radius: 12px; font-size: 16px; cursor: pointer; margin-right: 6px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+    .btn-task.active { background: #059669; border-color: #10b981; color: #fff; }
+    .btn-buzz { background: #f59e0b; color: #020617; border: 0; width: 42px; height: 42px; border-radius: 12px; font-size: 18px; cursor: pointer; margin-right: 6px; -webkit-flex-shrink: 0; flex-shrink: 0; font-weight: bold; }
+    .btn-clip { margin-right: 6px; -webkit-flex-shrink: 0; flex-shrink: 0; width: 42px; height: 42px; border-radius: 12px; }
     .text-input { -webkit-flex: 1; flex: 1; height: 42px; background: #020617; border: 1px solid #1e293b; border-radius: 12px; padding: 0 14px; color: inherit; font-size: 14px; margin-right: 8px; }
     body.light .text-input { background: #f8fafc; border-color: #cbd5e1; }
     .btn-send { background: #2563eb; color: #fff; border: 0; height: 42px; padding: 0 18px; border-radius: 12px; font-weight: 600; font-size: 13px; cursor: pointer; -webkit-flex-shrink: 0; flex-shrink: 0; }
@@ -223,7 +263,7 @@
 
         <div id="ch-list" class="ch-list"></div>
 
-        <!-- LISTA DE EQUIPO EN VIVO ESTILO MSN -->
+        <!-- LISTA DE EQUIPO EN VIVO (TOCANDO MENCIONÁS CON @) -->
         <div class="sb-section" style="margin-top:8px">
           <span>EQUIPO EN LÍNEA</span>
           <span id="online-count" style="color:#10b981">1 activo</span>
@@ -241,7 +281,7 @@
               <div id="u-custom-display" class="u-custom-msg" title="Tocá para cambiar tu frase personal">✏️ Escribir frase personal...</div>
             </div>
           </div>
-          <button id="logout-btn" class="btn-logout" type="button">Salir</button>
+          <button id="logout-btn" class="btn-logout" type="button">Cambiar</button>
         </div>
         <div class="msn-controls">
           <select id="status-select" class="status-select">
@@ -264,23 +304,41 @@
           </div>
         </div>
         <div class="top-actions">
+          <div id="search-box" class="search-box hidden">
+            <input id="search-input" type="text" placeholder="Buscar en canal...">
+            <button id="search-clear" class="search-close" type="button">✕</button>
+          </div>
+          <button id="btn-search" class="icon-btn" type="button" title="Buscar mensajes">🔍</button>
           <button id="btn-voice" class="icon-btn" type="button" title="Llamada de voz">📞</button>
           <button id="btn-video" class="icon-btn" type="button" title="Videollamada">📹</button>
         </div>
       </header>
+
+      <!-- BARRA SUPERIOR DE MENSAJE FIJADO (PINNED) -->
+      <div id="pin-bar" class="pin-bar hidden">
+        <div id="pin-text" class="pin-text"></div>
+        <button id="btn-unpin" class="btn-unpin" type="button">Desfijar</button>
+      </div>
 
       <div id="msg-area" class="msg-area"></div>
 
       <!-- BARRA INDICADORA DE "ESCRIBIENDO..." -->
       <div id="typing-bar" class="typing-bar"></div>
 
+      <!-- BARRA DE PREVISUALIZACIÓN DE RESPUESTA CITADA -->
+      <div id="reply-bar" class="reply-bar hidden">
+        <div id="reply-text" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:10px"></div>
+        <button id="reply-cancel" type="button" style="background:transparent;border:0;color:#94a3b8;cursor:pointer;font-weight:bold">✕</button>
+      </div>
+
       <div class="input-bar">
         <label class="icon-btn btn-clip" title="Adjuntar archivo">
           📎
           <input id="file-input" type="file" style="display:none">
         </label>
+        <button id="btn-task" class="btn-task" type="button" title="Crear tarea / checklist interactivo">☑️</button>
         <button id="btn-buzz" class="btn-buzz" type="button" title="Enviar Zumbido MSN">🔔</button>
-        <input id="msg-input" class="text-input" type="text" placeholder="Escribe un mensaje..." autocomplete="off">
+        <input id="msg-input" class="text-input" type="text" placeholder="Mensaje o @mención..." autocomplete="off">
         <button id="btn-send" class="btn-send" type="button">Enviar</button>
       </div>
     </main>
@@ -304,8 +362,9 @@
       var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlZHpndmdvYmplb2t4Zmh2bW9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1MzE4OTksImV4cCI6MjExMDEwNzg5OX0.tnxHWDOWQySJ8VDIQhYX5hmVHGvJCD7UlMrw7XeI2ZY';
 
       var state = {
-        user: '', chatId: 'gen-1', channels: [], presence: [],
+        user: '', chatId: 'gen-1', channels: [], messages: [], presence: [],
         myStatus: 'online', myCustom: '', isTyping: false, lastTypedAt: 0,
+        replyTo: null, searchQuery: '', lastPinnedMsg: null,
         lastMsgId: null, timer: null, titleTimer: null, dark: true, soundEnabled: true
       };
 
@@ -340,23 +399,20 @@
         x.send(body ? JSON.stringify(body) : null);
       }
 
-      // Sonido Clásico MSN al recibir mensaje de texto ("Tuc-tuc-tín")
-      function playMsnMessageSound() {
+      function playMsnMessageSound(isMention) {
         if (!state.soundEnabled || state.myStatus === 'busy') return;
         try {
           var Ctx = window.AudioContext || window.webkitAudioContext;
           if (!Ctx) return;
           var c = new Ctx();
-          var notes = [
-            { f: 587.33, t: 0, d: 0.09 },
-            { f: 880.0, t: 0.10, d: 0.09 },
-            { f: 1174.66, t: 0.20, d: 0.22 }
-          ];
+          var notes = isMention
+            ? [{ f: 783.99, t: 0, d: 0.08 }, { f: 1046.5, t: 0.09, d: 0.08 }, { f: 783.99, t: 0.18, d: 0.08 }, { f: 1318.51, t: 0.27, d: 0.25 }]
+            : [{ f: 587.33, t: 0, d: 0.09 }, { f: 880.0, t: 0.10, d: 0.09 }, { f: 1174.66, t: 0.20, d: 0.22 }];
           for (var i = 0; i < notes.length; i++) {
             (function (n) {
               var o = c.createOscillator(), g = c.createGain();
               o.type = 'sine'; o.frequency.value = n.f;
-              g.gain.setValueAtTime(0.18, c.currentTime + n.t);
+              g.gain.setValueAtTime(0.2, c.currentTime + n.t);
               g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + n.t + n.d);
               o.connect(g); g.connect(c.destination);
               o.start(c.currentTime + n.t); o.stop(c.currentTime + n.t + n.d);
@@ -365,12 +421,11 @@
         } catch (e) {}
       }
 
-      // Pestaña parpadeante estilo MSN cuando estás en otra ventana
-      function flashTabTitle(senderName) {
+      function flashTabTitle(senderName, isMention) {
         if (state.titleTimer) clearInterval(state.titleTimer);
         var toggle = false;
         state.titleTimer = setInterval(function () {
-          document.title = toggle ? 'NEFA Software Chat' : '💬 ¡Mensaje de ' + senderName + '!';
+          document.title = toggle ? 'NEFA Software Chat' : (isMention ? ('🔔 ¡' + senderName + ' te mencionó!') : ('💬 ¡Mensaje de ' + senderName + '!'));
           toggle = !toggle;
         }, 900);
       }
@@ -406,7 +461,6 @@
         } catch (e) {}
       }
 
-      // Sincronizar Presencia y "Escribiendo..." con Supabase
       function syncPresence(typingChannel) {
         if (!state.user) return;
         var typingVal = (typeof typingChannel === 'string') ? typingChannel : (state.isTyping ? state.chatId : '');
@@ -436,43 +490,51 @@
         var typingUsers = [];
 
         for (var i = 0; i < state.presence.length; i++) {
-          var p = state.presence[i];
-          var seenDiff = now - new Date(p.last_seen).getTime();
-          var isOnline = seenDiff < 40000;
-          if (isOnline) activeCount++;
+          (function (p) {
+            var seenDiff = now - new Date(p.last_seen).getTime();
+            var isOnline = seenDiff < 40000;
+            if (isOnline) activeCount++;
 
-          // Detectar si está escribiendo en este canal hace menos de 6 segundos
-          var typeDiff = now - new Date(p.typing_at).getTime();
-          if (isOnline && p.typing_in === state.chatId && typeDiff < 6000 && p.username.toLowerCase() !== state.user.toLowerCase()) {
-            typingUsers.push(p.username);
-          }
+            var typeDiff = now - new Date(p.typing_at).getTime();
+            if (isOnline && p.typing_in === state.chatId && typeDiff < 6000 && p.username.toLowerCase() !== state.user.toLowerCase()) {
+              typingUsers.push(p.username);
+            }
 
-          var row = document.createElement('div');
-          row.className = 'user-presence-item';
-          var dot = document.createElement('span');
-          var stClass = !isOnline ? 'dot-offline' : (p.status === 'away' ? 'dot-away' : (p.status === 'busy' ? 'dot-busy' : 'dot-online'));
-          dot.className = 'status-dot ' + stClass;
-          row.appendChild(dot);
+            var row = document.createElement('div');
+            row.className = 'user-presence-item';
+            row.title = 'Tocá para mencionar con @';
+            row.onclick = function () {
+              var shortName = p.username.split(' ')[0];
+              el('msg-input').value = el('msg-input').value + '@' + shortName + ' ';
+              toggleSidebar(false);
+              el('msg-input').focus();
+            };
 
-          var info = document.createElement('div');
-          info.className = 'up-info';
-          var nm = document.createElement('div');
-          nm.className = 'up-name';
-          var labelStatus = !isOnline ? ' (Desconectado)' : (p.status === 'away' ? ' (Ausente)' : (p.status === 'busy' ? ' (Ocupado)' : ''));
-          nm.textContent = p.username + labelStatus;
-          info.appendChild(nm);
+            var dot = document.createElement('span');
+            var stClass = !isOnline ? 'dot-offline' : (p.status === 'away' ? 'dot-away' : (p.status === 'busy' ? 'dot-busy' : 'dot-online'));
+            dot.className = 'status-dot ' + stClass;
+            row.appendChild(dot);
 
-          if (p.custom_status) {
-            var cs = document.createElement('div');
-            cs.className = 'up-custom';
-            cs.textContent = '“' + p.custom_status + '”';
-            info.appendChild(cs);
-          }
-          row.appendChild(info);
-          box.appendChild(row);
+            var info = document.createElement('div');
+            info.className = 'up-info';
+            var nm = document.createElement('div');
+            nm.className = 'up-name';
+            var labelStatus = !isOnline ? ' (Desconectado)' : (p.status === 'away' ? ' (Ausente)' : (p.status === 'busy' ? ' (Ocupado)' : ''));
+            nm.textContent = p.username + labelStatus;
+            info.appendChild(nm);
+
+            if (p.custom_status) {
+              var cs = document.createElement('div');
+              cs.className = 'up-custom';
+              cs.textContent = '“' + p.custom_status + '”';
+              info.appendChild(cs);
+            }
+            row.appendChild(info);
+            box.appendChild(row);
+          })(state.presence[i]);
         }
 
-        el('online-count').textContent = activeCount + (activeCount === 1 ? ' activo' : ' activos');
+        el('online-count').textContent = (activeCount || 1) + ((activeCount || 1) === 1 ? ' activo' : ' activos');
         el('typing-bar').textContent = typingUsers.length > 0 ? ('💬 ' + typingUsers.join(', ') + ' está escribiendo...') : '';
       }
 
@@ -527,6 +589,7 @@
             item.appendChild(btns);
             item.onclick = function () {
               state.chatId = ch.id; state.lastMsgId = null;
+              clearReply();
               toggleSidebar(false); renderChannels(); updateHeader(); loadMessages(true);
             };
             box.appendChild(item);
@@ -551,71 +614,235 @@
         });
       }
 
+      // --- FUNCIONES OPCIÓN 3: PIN, CHECKLISTS, CITAS Y MENCIONES ---
+      function togglePinMessage(m) {
+        var newType = (m.type === 'pinned') ? 'text' : 'pinned';
+        api('PATCH', 'messages?id=eq.' + encodeURIComponent(m.id), { type: newType }, null, function (err) {
+          if (!err) loadMessages(false);
+        });
+      }
+
+      function toggleTaskMessage(m) {
+        var raw = m.text || '';
+        var updated = raw;
+        var shortName = state.user.split(' ')[0];
+        if (raw.indexOf('[ ] ') !== -1) {
+          updated = raw.replace('[ ] ', '[x] ') + ' (✓ ' + shortName + ')';
+        } else if (raw.indexOf('[x] ') !== -1) {
+          updated = raw.replace('[x] ', '[ ] ').replace(/\s*\(✓ [^)]+\)$/, '');
+        } else {
+          return;
+        }
+        api('PATCH', 'messages?id=eq.' + encodeURIComponent(m.id), { text: updated }, null, function (err) {
+          if (!err) loadMessages(false);
+        });
+      }
+
+      function startReply(m) {
+        state.replyTo = m;
+        var clean = (m.text || '').replace(/^❝ [^\n]+\n/, '').substring(0, 60);
+        el('reply-text').textContent = '↩️ Respondiendo a ' + m.sender + ': ' + clean;
+        show('reply-bar', true);
+        el('msg-input').focus();
+      }
+
+      function clearReply() {
+        state.replyTo = null;
+        show('reply-bar', false);
+      }
+
+      function appendFormattedText(container, text) {
+        var parts = String(text || '').split(/(@[\wáéíóúÁÉÍÓÚñÑ.-]+)/g);
+        for (var i = 0; i < parts.length; i++) {
+          var part = parts[i];
+          if (part.indexOf('@') === 0 && part.length > 1) {
+            var sp = document.createElement('span');
+            sp.className = 'mention-tag';
+            sp.textContent = part;
+            container.appendChild(sp);
+          } else if (part) {
+            container.appendChild(document.createTextNode(part));
+          }
+        }
+      }
+
       function loadMessages(initial) {
         if (!state.chatId) return;
         api('GET', 'messages?select=*&channel_id=eq.' + encodeURIComponent(state.chatId) + '&order=created_at.asc', null, null, function (err, data) {
           if (!err && data) {
+            state.messages = data;
             if (data.length > 0) {
               var last = data[data.length - 1];
               if (!initial && state.lastMsgId && state.lastMsgId !== last.id) {
                 var fromOther = last.sender.toLowerCase() !== state.user.toLowerCase();
                 if (fromOther) {
+                  var firstName = state.user.split(' ')[0].toLowerCase();
+                  var lowTxt = (last.text || '').toLowerCase();
+                  var isMention = lowTxt.indexOf('@' + firstName) !== -1 || lowTxt.indexOf('@' + state.user.toLowerCase()) !== -1;
                   if (last.type === 'poke') {
                     buzzEffect();
                   } else {
-                    playMsnMessageSound();
+                    playMsnMessageSound(isMention);
                   }
-                  flashTabTitle(last.sender);
+                  flashTabTitle(last.sender, isMention);
                 }
               }
               state.lastMsgId = last.id;
             }
-            renderMessages(data);
+            renderMessages();
           }
         });
       }
 
-      function renderMessages(list) {
+      function renderMessages() {
+        var list = state.messages;
         var area = el('msg-area');
         var nearBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) < 90;
         area.innerHTML = '';
+
+        // Actualizar barra de mensaje fijado arriba del canal
+        var pinnedList = [];
+        for (var p = 0; p < list.length; p++) {
+          if (list[p].type === 'pinned') pinnedList.push(list[p]);
+        }
+        if (pinnedList.length > 0) {
+          var lastPin = pinnedList[pinnedList.length - 1];
+          state.lastPinnedMsg = lastPin;
+          var cleanPin = (lastPin.text || '').replace(/^❝ [^\n]+\n/, '');
+          el('pin-text').textContent = '📌 Fijado (' + lastPin.sender + '): ' + cleanPin;
+          show('pin-bar', true);
+        } else {
+          state.lastPinnedMsg = null;
+          show('pin-bar', false);
+        }
+
+        var q = state.searchQuery.toLowerCase();
         for (var i = 0; i < list.length; i++) {
-          var m = list[i], me = m.sender && m.sender.toLowerCase() === state.user.toLowerCase();
-          if (m.type === 'poke') {
-            var ce = document.createElement('div'); ce.className = 'center-event';
-            var pb = document.createElement('div'); pb.className = 'poke-badge';
-            pb.textContent = '🔔 ¡' + m.sender + ' ha enviado un Zumbido! ⚡ (' + (m.time || '') + ')';
-            ce.appendChild(pb); area.appendChild(ce);
-          } else if (m.type === 'call') {
-            var cc = document.createElement('div'); cc.className = 'center-event';
-            var cb = document.createElement('div'); cb.className = 'call-badge';
-            var st = document.createElement('div'); st.style.fontWeight = 'bold';
-            st.textContent = m.sender + ' ' + (m.text || 'inició una llamada') + ' (' + (m.time || '') + ')';
-            var jb = document.createElement('button'); jb.className = 'btn-join'; jb.textContent = 'Unirse a la Sala';
-            jb.onclick = function () { startCall('video', false); };
-            cb.appendChild(st); cb.appendChild(jb); cc.appendChild(cb); area.appendChild(cc);
-          } else {
-            var row = document.createElement('div'); row.className = 'msg-row' + (me ? ' me' : '');
-            if (!me) {
-              var sn = document.createElement('span'); sn.className = 'msg-sender'; sn.textContent = m.sender;
-              row.appendChild(sn);
+          (function (m) {
+            if (q) {
+              var matchTxt = (m.text || '').toLowerCase().indexOf(q) !== -1;
+              var matchSnd = (m.sender || '').toLowerCase().indexOf(q) !== -1;
+              if (!matchTxt && !matchSnd) return;
             }
-            var bb = document.createElement('div'); bb.className = 'msg-bubble'; bb.textContent = m.text || '';
-            if (m.time) {
-              var tm = document.createElement('span'); tm.className = 'msg-time'; tm.textContent = m.time + (me ? ' ✓✓' : '');
-              bb.appendChild(tm);
+
+            var me = m.sender && m.sender.toLowerCase() === state.user.toLowerCase();
+            if (m.type === 'poke') {
+              var ce = document.createElement('div'); ce.className = 'center-event';
+              var pb = document.createElement('div'); pb.className = 'poke-badge';
+              pb.textContent = '🔔 ¡' + m.sender + ' ha enviado un Zumbido! ⚡ (' + (m.time || '') + ')';
+              ce.appendChild(pb); area.appendChild(ce);
+            } else if (m.type === 'call') {
+              var cc = document.createElement('div'); cc.className = 'center-event';
+              var cb = document.createElement('div'); cb.className = 'call-badge';
+              var st = document.createElement('div'); st.style.fontWeight = 'bold';
+              st.textContent = m.sender + ' ' + (m.text || 'inició una llamada') + ' (' + (m.time || '') + ')';
+              var jb = document.createElement('button'); jb.className = 'btn-join'; jb.textContent = 'Unirse ahora';
+              jb.onclick = function () { startCall('video', false); };
+              cb.appendChild(st); cb.appendChild(jb); cc.appendChild(cb); area.appendChild(cc);
+            } else {
+              var row = document.createElement('div'); row.className = 'msg-row' + (me ? ' me' : '');
+              if (!me) {
+                var sn = document.createElement('span'); sn.className = 'msg-sender'; sn.textContent = m.sender;
+                row.appendChild(sn);
+              }
+
+              var flexWrap = document.createElement('div');
+              flexWrap.className = 'msg-flex';
+
+              var bb = document.createElement('div');
+              bb.className = 'msg-bubble' + (m.type === 'pinned' ? ' pinned-ring' : '');
+
+              // Separar cita si existe
+              var rawTxt = m.text || '';
+              var quoteHdr = null;
+              var mainTxt = rawTxt;
+              if (rawTxt.indexOf('❝ ') === 0) {
+                var nl = rawTxt.indexOf('\n');
+                if (nl !== -1) {
+                  quoteHdr = rawTxt.substring(0, nl);
+                  mainTxt = rawTxt.substring(nl + 1);
+                }
+              }
+
+              if (quoteHdr) {
+                var qBox = document.createElement('div');
+                qBox.className = 'quote-box';
+                qBox.textContent = quoteHdr;
+                bb.appendChild(qBox);
+              }
+
+              var isUnchecked = mainTxt.indexOf('[ ] ') === 0;
+              var isChecked = mainTxt.indexOf('[x] ') === 0;
+              if (isUnchecked || isChecked) {
+                var tRow = document.createElement('div');
+                tRow.className = 'task-row';
+                tRow.onclick = function () { toggleTaskMessage(m); };
+                var tBox = document.createElement('span');
+                tBox.className = 'task-box';
+                tBox.textContent = isChecked ? '☑️' : '⬜';
+                var tTxt = document.createElement('span');
+                if (isChecked) tTxt.className = 'task-done';
+                appendFormattedText(tTxt, mainTxt.substring(4));
+                tRow.appendChild(tBox);
+                tRow.appendChild(tTxt);
+                bb.appendChild(tRow);
+              } else {
+                var pTxt = document.createElement('div');
+                appendFormattedText(pTxt, mainTxt);
+                bb.appendChild(pTxt);
+              }
+
+              if (m.time) {
+                var tm = document.createElement('span');
+                tm.className = 'msg-time';
+                tm.textContent = (m.type === 'pinned' ? '📌 ' : '') + m.time + (me ? ' ✓✓' : '');
+                bb.appendChild(tm);
+              }
+
+              // Botones de Responder y Fijar
+              var acts = document.createElement('div');
+              acts.className = 'msg-actions';
+
+              var repBtn = document.createElement('button');
+              repBtn.type = 'button';
+              repBtn.className = 'act-btn';
+              repBtn.title = 'Responder';
+              repBtn.textContent = '↩️';
+              repBtn.onclick = function () { startReply(m); };
+
+              var pinBtn = document.createElement('button');
+              pinBtn.type = 'button';
+              pinBtn.className = 'act-btn' + (m.type === 'pinned' ? ' active-pin' : '');
+              pinBtn.title = m.type === 'pinned' ? 'Desfijar' : 'Fijar arriba';
+              pinBtn.textContent = '📌';
+              pinBtn.onclick = function () { togglePinMessage(m); };
+
+              acts.appendChild(repBtn);
+              acts.appendChild(pinBtn);
+
+              flexWrap.appendChild(bb);
+              flexWrap.appendChild(acts);
+              row.appendChild(flexWrap);
+              area.appendChild(row);
             }
-            row.appendChild(bb); area.appendChild(row);
-          }
+          })(list[i]);
         }
         if (nearBottom) area.scrollTop = area.scrollHeight;
       }
 
       function sendMsg(txt, type) {
         state.isTyping = false;
+        var finalTxt = txt;
+        if (state.replyTo && (!type || type === 'text')) {
+          var cleanOrig = (state.replyTo.text || '').replace(/^❝ [^\n]+\n/, '').substring(0, 65);
+          finalTxt = '❝ @' + state.replyTo.sender + ': ' + cleanOrig + '\n' + txt;
+        }
+        clearReply();
+        el('btn-task').className = 'btn-task';
+
         var msg = {
           id: 'msg-' + new Date().getTime() + '-' + Math.floor(Math.random() * 9999),
-          channel_id: state.chatId, sender: state.user, text: txt, time: nowTime(), type: type || 'text'
+          channel_id: state.chatId, sender: state.user, text: finalTxt, time: nowTime(), type: type || 'text'
         };
         state.lastMsgId = msg.id;
         api('POST', 'messages', [msg], null, function (err) {
@@ -675,7 +902,7 @@
           loadMessages(false);
           loadChannels(false);
           syncPresence();
-        }, 2200);
+        }, 2000);
       }
 
       el('login-form').onsubmit = function (e) {
@@ -709,6 +936,45 @@
       el('open-sb-btn').onclick = function () { toggleSidebar(true); };
       el('close-sb-btn').onclick = function () { toggleSidebar(false); };
       el('sb-backdrop').onclick = function () { toggleSidebar(false); };
+
+      // Eventos Buscador, Pin Bar, Reply y Checklist
+      el('btn-search').onclick = function () {
+        var isHidden = el('search-box').className.indexOf('hidden') !== -1;
+        show('search-box', isHidden);
+        if (isHidden) {
+          el('search-input').focus();
+        } else {
+          state.searchQuery = '';
+          el('search-input').value = '';
+          renderMessages();
+        }
+      };
+      el('search-input').onkeyup = function () {
+        state.searchQuery = el('search-input').value;
+        renderMessages();
+      };
+      el('search-clear').onclick = function () {
+        state.searchQuery = '';
+        el('search-input').value = '';
+        show('search-box', false);
+        renderMessages();
+      };
+      el('btn-unpin').onclick = function () {
+        if (state.lastPinnedMsg) togglePinMessage(state.lastPinnedMsg);
+      };
+      el('reply-cancel').onclick = clearReply;
+      el('btn-task').onclick = function () {
+        var inp = el('msg-input');
+        if (inp.value.indexOf('[ ] ') === 0) {
+          inp.value = inp.value.substring(4);
+          el('btn-task').className = 'btn-task';
+        } else {
+          inp.value = '[ ] ' + inp.value;
+          el('btn-task').className = 'btn-task active';
+        }
+        inp.focus();
+      };
+
       el('toggle-add-ch').onclick = function () { show('add-ch-box', true); };
       el('cancel-add-ch').onclick = function () { show('add-ch-box', false); };
       el('save-add-ch').onclick = function () {
