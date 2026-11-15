@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Hash, Send, Paperclip, Sun, Moon, Phone, Video, CheckCheck, 
-  Zap, ArrowRight, BellRing, Menu, X, Plus, Edit2, Trash2, Check, AlertCircle, PhoneCall
+  Zap, ArrowRight, BellRing, Menu, X, Plus, Edit2, Trash2, Check, 
+  AlertCircle, PhoneCall, Volume2, VolumeX, MessageSquare
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://fedzgvgobjeokxfhvmok.supabase.co';
@@ -24,13 +25,23 @@ interface Channel {
   description: string;
 }
 
-async function sbFetch(path: string, method: string = 'GET', body?: unknown) {
+interface PresenceUser {
+  username: string;
+  status: 'online' | 'away' | 'busy';
+  custom_status: string;
+  typing_in: string;
+  typing_at: string;
+  last_seen: string;
+}
+
+async function sbFetch(path: string, method: string = 'GET', body?: unknown, extraHeaders?: Record<string, string>) {
   const headers: Record<string, string> = {
     apikey: SUPABASE_KEY,
     Authorization: `Bearer ${SUPABASE_KEY}`,
     'Content-Type': 'application/json',
+    ...(extraHeaders || {}),
   };
-  if (method !== 'GET') {
+  if (method !== 'GET' && !extraHeaders?.['Prefer']) {
     headers['Prefer'] = 'return=representation';
   }
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -55,7 +66,13 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>('Franco Sierralta');
   const [darkMode, setDarkMode] = useState<boolean>(true);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+
+  // Estados MSN Messenger
+  const [myStatus, setMyStatus] = useState<'online' | 'away' | 'busy'>('online');
+  const [myCustomStatus, setMyCustomStatus] = useState<string>('');
+  const [presenceList, setPresenceList] = useState<PresenceUser[]>([]);
 
   const [channels, setChannels] = useState<Channel[]>([
     { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo' },
@@ -80,6 +97,57 @@ export default function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastProcessedMsgId = useRef<string | null>(null);
+  const isTypingRef = useRef<boolean>(false);
+  const lastTypedAtRef = useRef<number>(0);
+  const titleIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sonido clásico MSN al entrar un mensaje nuevo ("Tuc-tuc-tín")
+  const playMsnMessageSound = useCallback(() => {
+    if (!soundEnabled || myStatus === 'busy') return;
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const notes = [
+        { f: 587.33, t: 0, d: 0.09 },
+        { f: 880.0, t: 0.10, d: 0.09 },
+        { f: 1174.66, t: 0.20, d: 0.22 },
+      ];
+      notes.forEach((n) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(n.f, ctx.currentTime + n.t);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime + n.t);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.t + n.d);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + n.t);
+        osc.stop(ctx.currentTime + n.t + n.d);
+      });
+    } catch {}
+  }, [soundEnabled, myStatus]);
+
+  // Pestaña parpadeante estilo MSN cuando entra un mensaje
+  const flashTabTitle = useCallback((sender: string) => {
+    if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
+    let toggle = false;
+    titleIntervalRef.current = setInterval(() => {
+      document.title = toggle ? 'NEFA Software Chat' : `💬 ¡Mensaje de ${sender}!`;
+      toggle = !toggle;
+    }, 900);
+  }, []);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (titleIntervalRef.current) {
+        clearInterval(titleIntervalRef.current);
+        titleIntervalRef.current = null;
+        document.title = 'NEFA Software Chat';
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   const playMsnNudgeEffect = useCallback(() => {
     setIsShaking(false);
@@ -90,6 +158,7 @@ export default function App() {
       navigator.vibrate([120, 40, 120, 40, 180, 40, 250]);
     }
 
+    if (!soundEnabled) return;
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
@@ -107,7 +176,7 @@ export default function App() {
         osc.stop(ctx.currentTime + t + 0.07);
       });
     } catch {}
-  }, []);
+  }, [soundEnabled]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && /OS [789]_/.test(navigator.userAgent)) {
@@ -117,6 +186,10 @@ export default function App() {
 
     try {
       const savedName = localStorage.getItem('nefa_username');
+      const savedStatus = localStorage.getItem('nefa_status') as 'online' | 'away' | 'busy';
+      const savedCustom = localStorage.getItem('nefa_custom_msg');
+      if (savedStatus) setMyStatus(savedStatus);
+      if (savedCustom) setMyCustomStatus(savedCustom);
       if (savedName && savedName.trim()) {
         setUserName(savedName.trim());
         setIsLoggedIn(true);
@@ -141,6 +214,32 @@ export default function App() {
     setIsLoggedIn(false);
   };
 
+  // Sincronización silenciosa de presencia y "escribiendo..."
+  const syncPresence = useCallback(async (overrideTypingChannel?: string) => {
+    if (!userName) return;
+    const typingChannel = typeof overrideTypingChannel === 'string'
+      ? overrideTypingChannel
+      : (isTypingRef.current ? currentChatId : '');
+
+    try {
+      await sbFetch('presence', 'POST', [{
+        username: userName,
+        status: myStatus,
+        custom_status: myCustomStatus,
+        typing_in: typingChannel,
+        typing_at: new Date().toISOString(),
+        last_seen: new Date().toISOString(),
+      }], { Prefer: 'resolution=merge-duplicates' });
+
+      const list = await sbFetch('presence?select=*&order=username.asc');
+      if (Array.isArray(list)) {
+        setPresenceList(list);
+      }
+    } catch {
+      // Si la tabla presence aún no fue creada en Supabase, falla en silencio sin molestar
+    }
+  }, [userName, myStatus, myCustomStatus, currentChatId]);
+
   const fetchChannels = useCallback(async () => {
     try {
       const data = await sbFetch('channels?select=*&order=created_at.asc');
@@ -163,8 +262,13 @@ export default function App() {
         if (data.length > 0) {
           const latest = data[data.length - 1] as Message;
           if (!isInitial && lastProcessedMsgId.current && lastProcessedMsgId.current !== latest.id) {
-            if (latest.type === 'poke' && latest.sender.toLowerCase() !== userName.toLowerCase()) {
-              playMsnNudgeEffect();
+            if (latest.sender.toLowerCase() !== userName.toLowerCase()) {
+              if (latest.type === 'poke') {
+                playMsnNudgeEffect();
+              } else {
+                playMsnMessageSound();
+              }
+              flashTabTitle(latest.sender);
             }
           }
           lastProcessedMsgId.current = latest.id;
@@ -175,20 +279,25 @@ export default function App() {
       const msg = err instanceof Error ? err.message : 'Error desconocido';
       setDbError(`Error Mensajes: ${msg}`);
     }
-  }, [currentChatId, userName, playMsnNudgeEffect]);
+  }, [currentChatId, userName, playMsnNudgeEffect, playMsnMessageSound, flashTabTitle]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
     fetchChannels();
     fetchMessages(true);
+    syncPresence();
 
     const interval = setInterval(() => {
+      if (isTypingRef.current && Date.now() - lastTypedAtRef.current > 4000) {
+        isTypingRef.current = false;
+      }
       fetchMessages(false);
       fetchChannels();
+      syncPresence();
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [isLoggedIn, currentChatId, fetchChannels, fetchMessages]);
+  }, [isLoggedIn, currentChatId, fetchChannels, fetchMessages, syncPresence]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -254,6 +363,20 @@ export default function App() {
       }
     } catch {}
   };
+  const handleEditCustomStatus = () => {
+    const val = prompt('Escribí tu frase personal estilo MSN (ej. Cotizando embarque / En reunión):', myCustomStatus);
+    if (val !== null) {
+      const clean = val.trim();
+      setMyCustomStatus(clean);
+      try { localStorage.setItem('nefa_custom_msg', clean); } catch {}
+    }
+  };
+
+  const handleChangeStatus = (newSt: 'online' | 'away' | 'busy') => {
+    setMyStatus(newSt);
+    try { localStorage.setItem('nefa_status', newSt); } catch {}
+  };
+
   const triggerPoke = async () => {
     playMsnNudgeEffect();
 
@@ -302,6 +425,7 @@ export default function App() {
     const content = textContent ?? inputText;
     if (!content.trim() && customType === 'text') return;
 
+    isTypingRef.current = false;
     const newMessage: Message = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       channel_id: currentChatId,
@@ -317,10 +441,20 @@ export default function App() {
 
     try {
       await sbFetch('messages', 'POST', [newMessage]);
+      syncPresence('');
       setDbError(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error';
       setDbError(`No se guardó el mensaje: ${msg}`);
+    }
+  };
+
+  const handleInputTyping = (val: string) => {
+    setInputText(val);
+    lastTypedAtRef.current = Date.now();
+    if (!isTypingRef.current && val.trim()) {
+      isTypingRef.current = true;
+      syncPresence(currentChatId);
     }
   };
 
@@ -331,6 +465,15 @@ export default function App() {
   };
 
   const activeChannel = channels.find(c => c.id === currentChatId);
+  const nowMs = Date.now();
+
+  const onlineUsersCount = presenceList.filter(p => nowMs - new Date(p.last_seen).getTime() < 40000).length;
+  const typingUsers = presenceList.filter(p => 
+    nowMs - new Date(p.last_seen).getTime() < 40000 &&
+    p.typing_in === currentChatId &&
+    nowMs - new Date(p.typing_at).getTime() < 6000 &&
+    p.username.toLowerCase() !== userName.toLowerCase()
+  ).map(p => p.username);
 
   const safeRoomName = `NEFA_Software_Room_${String(currentChatId).replace(/[^a-zA-Z0-9]/g, '_')}`;
   const jitsiUrl = `https://meet.jit.si/${safeRoomName}#userInfo.displayName="${encodeURIComponent(userName)}"&config.prejoinPageEnabled=false&config.startWithVideoMuted=${callType === 'voice'}&config.disableDeepLinking=true`;
@@ -429,7 +572,7 @@ export default function App() {
           />
         )}
 
-        {/* SIDEBAR DE CANALES */}
+        {/* SIDEBAR DE CANALES + EQUIPO EN LÍNEA */}
         <div className={`fixed md:static inset-y-0 left-0 z-40 w-72 sm:w-80 flex flex-col border-r transition-transform duration-200 ease-in-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         } ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
@@ -447,6 +590,13 @@ export default function App() {
             
             <div className="flex items-center gap-1">
               <button 
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className={`p-2 rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
+                title="Activar/Silenciar sonidos MSN"
+              >
+                {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
+              </button>
+              <button 
                 onClick={() => setDarkMode(!darkMode)}
                 className={`p-2 rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-800 text-yellow-400' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
               >
@@ -461,123 +611,213 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
-            <div className="flex items-center justify-between px-2 mb-2">
-              <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Canales</span>
-              <button 
-                onClick={() => setIsAddingChannel(!isAddingChannel)}
-                className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded-lg flex items-center gap-1 font-medium"
-              >
-                <Plus className="w-3.5 h-3.5" /> Nuevo
-              </button>
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+            {/* CANALES */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between px-2 mb-2">
+                <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Canales</span>
+                <button 
+                  onClick={() => setIsAddingChannel(!isAddingChannel)}
+                  className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded-lg flex items-center gap-1 font-medium"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Nuevo
+                </button>
+              </div>
+
+              {isAddingChannel && (
+                <div className={`p-3 rounded-xl border mb-3 space-y-2 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-300'}`}>
+                  <input
+                    type="text"
+                    placeholder="Nombre del canal (ej. ventas)"
+                    value={newChannelName}
+                    onChange={(e) => setNewChannelName(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Descripción corta"
+                    value={newChannelDesc}
+                    onChange={(e) => setNewChannelDesc(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
+                  />
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button onClick={() => setIsAddingChannel(false)} className="text-xs text-slate-400 px-2 py-1">Cancelar</button>
+                    <button onClick={handleCreateChannel} className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg font-semibold">Crear</button>
+                  </div>
+                </div>
+              )}
+
+              {channels.map(ch => (
+                <div
+                  key={ch.id}
+                  onClick={() => { setCurrentChatId(ch.id); setSidebarOpen(false); }}
+                  className={`group w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
+                    currentChatId === ch.id 
+                      ? (darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200') 
+                      : (darkMode ? 'text-slate-300 hover:bg-slate-800/60' : 'text-slate-700 hover:bg-slate-100')
+                  }`}
+                >
+                  {editingChannelId === ch.id ? (
+                    <div className="flex-1 space-y-1.5 mr-2" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={editChannelName}
+                        onChange={(e) => setEditChannelName(e.target.value)}
+                        className="w-full px-2 py-1 text-xs rounded bg-slate-950 border border-blue-500 text-white outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={editChannelDesc}
+                        onChange={(e) => setEditChannelDesc(e.target.value)}
+                        placeholder="Descripción"
+                        className="w-full px-2 py-1 text-[10px] rounded bg-slate-950 border border-slate-700 text-slate-300 outline-none"
+                      />
+                      <div className="flex gap-2 pt-1">
+                        <button onClick={(e) => handleSaveChannelEdit(ch.id, e)} className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Guardar
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); setEditingChannelId(null); }} className="text-slate-400 text-[10px]">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2.5 truncate pr-2">
+                        <Hash className="w-4 h-4 opacity-70 shrink-0" />
+                        <div className="truncate">
+                          <p className="text-xs font-semibold truncate">{ch.name}</p>
+                          {ch.description && <p className="text-[10px] opacity-60 truncate">{ch.description}</p>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-80 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <button 
+                          onClick={(e) => startEditingChannel(ch, e)}
+                          className="p-1.5 hover:bg-slate-700/50 rounded-lg text-slate-400 hover:text-white"
+                          title="Editar canal"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        {channels.length > 1 && (
+                          <button 
+                            onClick={(e) => handleDeleteChannel(ch.id, e)}
+                            className="p-1.5 hover:bg-red-500/20 rounded-lg text-slate-400 hover:text-red-400"
+                            title="Eliminar canal"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
 
-            {isAddingChannel && (
-              <div className={`p-3 rounded-xl border mb-3 space-y-2 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-300'}`}>
-                <input
-                  type="text"
-                  placeholder="Nombre del canal (ej. ventas)"
-                  value={newChannelName}
-                  onChange={(e) => setNewChannelName(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
-                />
-                <input
-                  type="text"
-                  placeholder="Descripción corta"
-                  value={newChannelDesc}
-                  onChange={(e) => setNewChannelDesc(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
-                />
-                <div className="flex justify-end gap-2 pt-1">
-                  <button onClick={() => setIsAddingChannel(false)} className="text-xs text-slate-400 px-2 py-1">Cancelar</button>
-                  <button onClick={handleCreateChannel} className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg font-semibold">Crear</button>
-                </div>
+            {/* EQUIPO EN LÍNEA (MSN PRESENCE) */}
+            <div className={`space-y-1.5 pt-3 border-t ${darkMode ? 'border-slate-800/70' : 'border-slate-200'}`}>
+              <div className="flex items-center justify-between px-2">
+                <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Equipo en línea</span>
+                <span className="text-[10px] font-bold text-emerald-400">
+                  {onlineUsersCount || 1} {(onlineUsersCount || 1) === 1 ? 'activo' : 'activos'}
+                </span>
               </div>
-            )}
 
-            {channels.map(ch => (
-              <div
-                key={ch.id}
-                onClick={() => { setCurrentChatId(ch.id); setSidebarOpen(false); }}
-                className={`group w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
-                  currentChatId === ch.id 
-                    ? (darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200') 
-                    : (darkMode ? 'text-slate-300 hover:bg-slate-800/60' : 'text-slate-700 hover:bg-slate-100')
-                }`}
-              >
-                {editingChannelId === ch.id ? (
-                  <div className="flex-1 space-y-1.5 mr-2" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="text"
-                      value={editChannelName}
-                      onChange={(e) => setEditChannelName(e.target.value)}
-                      className="w-full px-2 py-1 text-xs rounded bg-slate-950 border border-blue-500 text-white outline-none"
-                    />
-                    <input
-                      type="text"
-                      value={editChannelDesc}
-                      onChange={(e) => setEditChannelDesc(e.target.value)}
-                      placeholder="Descripción"
-                      className="w-full px-2 py-1 text-[10px] rounded bg-slate-950 border border-slate-700 text-slate-300 outline-none"
-                    />
-                    <div className="flex gap-2 pt-1">
-                      <button onClick={(e) => handleSaveChannelEdit(ch.id, e)} className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
-                        <Check className="w-3 h-3" /> Guardar
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); setEditingChannelId(null); }} className="text-slate-400 text-[10px]">
-                        Cancelar
-                      </button>
+              <div className="space-y-1">
+                {presenceList.length === 0 ? (
+                  <div className="px-2.5 py-1.5 rounded-xl flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                    <div className="truncate flex-1">
+                      <p className="text-xs font-semibold truncate">{userName}</p>
+                      {myCustomStatus && <p className="text-[10px] text-slate-400 italic truncate">“{myCustomStatus}”</p>}
                     </div>
                   </div>
                 ) : (
-                  <>
-                    <div className="flex items-center gap-2.5 truncate pr-2">
-                      <Hash className="w-4 h-4 opacity-70 shrink-0" />
-                      <div className="truncate">
-                        <p className="text-xs font-semibold truncate">{ch.name}</p>
-                        {ch.description && <p className="text-[10px] opacity-60 truncate">{ch.description}</p>}
+                  presenceList.map((p) => {
+                    const isOnline = nowMs - new Date(p.last_seen).getTime() < 40000;
+                    const dotColor = !isOnline
+                      ? 'bg-slate-600 opacity-50'
+                      : p.status === 'away'
+                      ? 'bg-amber-500 shadow-sm shadow-amber-500/50'
+                      : p.status === 'busy'
+                      ? 'bg-red-500 shadow-sm shadow-red-500/50'
+                      : 'bg-emerald-500 shadow-sm shadow-emerald-500/50';
+
+                    const statusLabel = !isOnline
+                      ? ' (Desconectado)'
+                      : p.status === 'away'
+                      ? ' (Ausente)'
+                      : p.status === 'busy'
+                      ? ' (Ocupado)'
+                      : '';
+
+                    return (
+                      <div key={p.username} className="px-2.5 py-1.5 rounded-xl flex items-center gap-2.5">
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
+                        <div className="truncate flex-1">
+                          <p className="text-xs font-semibold truncate">
+                            {p.username} <span className="text-[10px] font-normal opacity-60">{statusLabel}</span>
+                          </p>
+                          {p.custom_status && (
+                            <p className="text-[10px] text-slate-400 italic truncate">“{p.custom_status}”</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-80 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                      <button 
-                        onClick={(e) => startEditingChannel(ch, e)}
-                        className="p-1.5 hover:bg-slate-700/50 rounded-lg text-slate-400 hover:text-white"
-                        title="Editar canal"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      {channels.length > 1 && (
-                        <button 
-                          onClick={(e) => handleDeleteChannel(ch.id, e)}
-                          className="p-1.5 hover:bg-red-500/20 rounded-lg text-slate-400 hover:text-red-400"
-                          title="Eliminar canal"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </>
+                    );
+                  })
                 )}
               </div>
-            ))}
+            </div>
           </div>
 
-          <div className={`p-3 border-t ${darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'} flex items-center justify-between`}>
-            <div className="flex items-center gap-2.5 truncate">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                {userName.substring(0, 2).toUpperCase()}
+          {/* FOOTER PERFIL CON SELECTOR DE ESTADO Y FRASE MSN */}
+          <div className={`p-3 border-t ${darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'} space-y-2`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5 truncate">
+                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                  {userName.substring(0, 2).toUpperCase()}
+                </div>
+                <div className="truncate">
+                  <p className="text-xs font-bold truncate">{userName}</p>
+                  <p 
+                    onClick={handleEditCustomStatus}
+                    className="text-[10px] text-blue-400 hover:underline cursor-pointer truncate max-w-[155px]"
+                    title="Tocá para cambiar tu frase personal"
+                  >
+                    {myCustomStatus ? `“${myCustomStatus}”` : '✏️ Escribir frase personal...'}
+                  </p>
+                </div>
               </div>
-              <div className="truncate">
-                <p className="text-xs font-bold truncate">{userName}</p>
-                <p className="text-[10px] text-emerald-400">Conectado</p>
-              </div>
+              <button 
+                onClick={handleLogout} 
+                className="text-xs text-red-400 hover:underline px-2 py-1"
+              >
+                Cambiar
+              </button>
             </div>
-            <button 
-              onClick={handleLogout} 
-              className="text-xs text-red-400 hover:underline px-2 py-1"
-            >
-              Cambiar
-            </button>
+
+            <div className="flex items-center gap-1.5">
+              <select
+                value={myStatus}
+                onChange={(e) => handleChangeStatus(e.target.value as 'online' | 'away' | 'busy')}
+                className={`flex-1 text-[11px] px-2 py-1.5 rounded-lg border outline-none cursor-pointer ${
+                  darkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-300 text-slate-800'
+                }`}
+              >
+                <option value="online">🟢 Conectado</option>
+                <option value="away">🟠 Ausente (Vuelvo enseguida)</option>
+                <option value="busy">🔴 Ocupado (No molestar)</option>
+              </select>
+              <button
+                onClick={handleEditCustomStatus}
+                className={`px-2.5 py-1.5 text-[11px] rounded-lg border flex items-center gap-1 ${
+                  darkMode ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700'
+                }`}
+                title="Cambiar frase personal"
+              >
+                <MessageSquare className="w-3 h-3" /> Frase
+              </button>
+            </div>
           </div>
         </div>
 
@@ -678,6 +918,13 @@ export default function App() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* INDICADOR DE "ESCRIBIENDO..." EN VIVO */}
+          {typingUsers.length > 0 && (
+            <div className={`px-4 py-1 text-[11px] italic text-blue-400 ${darkMode ? 'bg-slate-950' : 'bg-slate-50'} shrink-0`}>
+              💬 {typingUsers.join(', ')} está escribiendo...
+            </div>
+          )}
+
           {/* Barra de Entrada */}
           <div className={`p-2.5 sm:p-4 border-t ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
             <div className="flex items-center gap-1.5 sm:gap-2">
@@ -699,7 +946,7 @@ export default function App() {
                   type="text" 
                   placeholder={`Mensaje en #${activeChannel?.name || 'canal'}...`}
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  onChange={(e) => handleInputTyping(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage('text')}
                   className="w-full bg-transparent border-none outline-none text-xs sm:text-sm"
                 />
