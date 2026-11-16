@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://fedzgvgobjeokxfhvmok.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlZHpndmdvYmplb2t4Zmh2bW9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1MzE4OTksImV4cCI6MjExMDEwNzg5OX0.tnxHWDOWQySJ8VDIQhYX5hmVHGvJCD7UlMrw7XeI2ZY';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlZHpndmdvYmplb2t4Zmh2bW9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1MzE4OTksImV4cCI2MjExMDEwNzg5OX0.tnxHWDOWQySJ8VDIQhYX5hmVHGvJCD7UlMrw7XeI2ZY';
 const DEFAULT_GROQ_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
 
 interface Message {
@@ -93,7 +93,7 @@ async function askGroqQwen(apiKey: string, promptText: string, recentMessages: M
     `Eres NEFA AI (@nefa), asistente inteligente para el equipo de "De China al Mundo" / "NEFA Software". ` +
     `Ayudas con logística internacional China-Argentina, cálculo de CBM, costos, aduana y operaciones. Responde claro y conciso en español. Canal: #${channelName}. Usuario: ${senderName}.`;
 
-  const modelsToTry = ['qwen/qwen3-32b', 'qwen-qwq-32b', 'qwen-2.5-32b'];
+  const modelsToTry = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'];
   let lastError = 'No se pudo conectar con Groq';
 
   for (const modelName of modelsToTry) {
@@ -119,7 +119,7 @@ async function askGroqQwen(apiKey: string, promptText: string, recentMessages: M
       lastError = e instanceof Error ? e.message : 'Error';
     }
   }
-  throw new Error(lastError);
+  return `⚠️ No se pudo responder en este momento (${lastError}).`;
 }
 
 export default function App() {
