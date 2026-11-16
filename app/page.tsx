@@ -4,11 +4,12 @@ import {
   Hash, Send, Paperclip, Sun, Moon, Phone, Video, CheckCheck, 
   Zap, ArrowRight, BellRing, Menu, X, Plus, Edit2, Trash2, Check, 
   AlertCircle, PhoneCall, Volume2, VolumeX, MessageSquare,
-  Pin, Search, Reply, CheckSquare, Square
+  Pin, Search, Reply, CheckSquare, Square, Bot, Sparkles, Users, DollarSign, Package
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://fedzgvgobjeokxfhvmok.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlZHpndmdvYmplb2t4Zmh2bW9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1MzE4OTksImV4cCI6MjExMDEwNzg5OX0.tnxHWDOWQySJ8VDIQhYX5hmVHGvJCD7UlMrw7XeI2ZY';
+const DEFAULT_GROQ_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
 
 interface Message {
   id: string;
@@ -33,6 +34,17 @@ interface PresenceUser {
   typing_in: string;
   typing_at: string;
   last_seen: string;
+}
+
+interface ClientRecord {
+  id: string;
+  name: string;
+  company: string;
+  shipment_status: string;
+  paid: number;
+  total_debt: number;
+  arrival_date: string;
+  notes: string;
 }
 
 async function sbFetch(path: string, method: string = 'GET', body?: unknown, extraHeaders?: Record<string, string>) {
@@ -63,14 +75,63 @@ async function sbFetch(path: string, method: string = 'GET', body?: unknown, ext
   return text ? JSON.parse(text) : null;
 }
 
+async function askGroqQwen(apiKey: string, promptText: string, recentMessages: Message[], channelName: string, senderName: string): Promise<string> {
+  const contextLines = recentMessages
+    .slice(-8)
+    .map(m => `${m.sender}: ${(m.text || '').replace(/^❝ [^\n]+\n/, '')}`)
+    .join('\n');
+
+  const systemPrompt = 
+    `Eres NEFA AI (@nefa), el asistente inteligente integrado en el chat interno del equipo de "De China al Mundo" / "NEFA Software". ` +
+    `Ayudas al equipo con logística internacional China-Argentina, cálculo de CBM, peso volumétrico, costos de importación, courier aéreo, carga marítima y gestión de clientes. ` +
+    `Responde de forma directa, clara y concisa en español. Canal actual: #${channelName}. Usuario: ${senderName}.`;
+
+  const modelsToTry = ['qwen/qwen3-32b', 'qwen-qwq-32b', 'qwen-2.5-32b'];
+  let lastError = 'No se pudo conectar con Groq';
+
+  for (const modelName of modelsToTry) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Contexto reciente:\n${contextLines}\n\nConsulta de ${senderName}: ${promptText}` }
+          ],
+          temperature: 0.5,
+          max_tokens: 1024,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const rawReply: string = data?.choices?.[0]?.message?.content || '';
+        return rawReply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim() || 'Respuesta vacía.';
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        lastError = errData?.error?.message || `HTTP ${res.status}`;
+      }
+    } catch (e: unknown) {
+      lastError = e instanceof Error ? e.message : 'Error de red';
+    }
+  }
+  throw new Error(lastError);
+}
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>('Franco Sierralta');
   const [darkMode, setDarkMode] = useState<boolean>(true);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'chat' | 'clients'>('chat');
 
-  // Estados MSN Messenger
+  // Estados MSN
   const [myStatus, setMyStatus] = useState<'online' | 'away' | 'busy'>('online');
   const [myCustomStatus, setMyCustomStatus] = useState<string>('');
   const [presenceList, setPresenceList] = useState<PresenceUser[]>([]);
@@ -85,14 +146,28 @@ export default function App() {
   const [editChannelName, setEditChannelName] = useState<string>('');
   const [editChannelDesc, setEditChannelDesc] = useState<string>('');
 
-  // Mensajes y Productividad
+  // Mensajes e IA
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState<string>('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [searchOpen, setSearchOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [groqApiKey, setGroqApiKey] = useState<string>(DEFAULT_GROQ_KEY);
+  const [isAiThinking, setIsAiThinking] = useState<boolean>(false);
   const [dbError, setDbError] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState<boolean>(false);
+
+  // Apartado de Clientes
+  const [clients, setClients] = useState<ClientRecord[]>([]);
+  const [isAddingClient, setIsAddingClient] = useState<boolean>(false);
+  const [clientName, setClientName] = useState<string>('');
+  const [clientCompany, setClientCompany] = useState<string>('');
+  const [clientStatus, setClientStatus] = useState<string>('En Aduana');
+  const [clientPaid, setClientPaid] = useState<string>('');
+  const [clientDebt, setClientDebt] = useState<string>('');
+  const [clientArrival, setClientArrival] = useState<string>('');
+  const [clientNotes, setClientNotes] = useState<string>('');
+  const [clientSearch, setClientSearch] = useState<string>('');
 
   // Llamadas
   const [isInCall, setIsInCall] = useState<boolean>(false);
@@ -111,17 +186,8 @@ export default function App() {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
       const notes = isMention
-        ? [
-            { f: 783.99, t: 0, d: 0.08 },
-            { f: 1046.50, t: 0.09, d: 0.08 },
-            { f: 783.99, t: 0.18, d: 0.08 },
-            { f: 1318.51, t: 0.27, d: 0.25 },
-          ]
-        : [
-            { f: 587.33, t: 0, d: 0.09 },
-            { f: 880.0, t: 0.10, d: 0.09 },
-            { f: 1174.66, t: 0.20, d: 0.22 },
-          ];
+        ? [{ f: 783.99, t: 0, d: 0.08 }, { f: 1046.50, t: 0.09, d: 0.08 }, { f: 783.99, t: 0.18, d: 0.08 }, { f: 1318.51, t: 0.27, d: 0.25 }]
+        : [{ f: 587.33, t: 0, d: 0.09 }, { f: 880.0, t: 0.10, d: 0.09 }, { f: 1174.66, t: 0.20, d: 0.22 }];
       notes.forEach((n) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -141,11 +207,7 @@ export default function App() {
     if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
     let toggle = false;
     titleIntervalRef.current = setInterval(() => {
-      document.title = toggle
-        ? 'NEFA Software Chat'
-        : isMention
-        ? `🔔 ¡${sender} te mencionó!`
-        : `💬 ¡Mensaje de ${sender}!`;
+      document.title = toggle ? 'NEFA Software Chat' : (isMention ? `🔔 ¡${sender} te mencionó!` : `💬 ¡Mensaje de ${sender}!`);
       toggle = !toggle;
     }, 900);
   }, []);
@@ -201,8 +263,10 @@ export default function App() {
       const savedName = localStorage.getItem('nefa_username');
       const savedStatus = localStorage.getItem('nefa_status') as 'online' | 'away' | 'busy';
       const savedCustom = localStorage.getItem('nefa_custom_msg');
+      const savedGroq = localStorage.getItem('nefa_groq_key');
       if (savedStatus) setMyStatus(savedStatus);
       if (savedCustom) setMyCustomStatus(savedCustom);
+      if (savedGroq) setGroqApiKey(savedGroq);
       if (savedName && savedName.trim()) {
         setUserName(savedName.trim());
         setIsLoggedIn(true);
@@ -227,12 +291,18 @@ export default function App() {
     setIsLoggedIn(false);
   };
 
-  // Sincronización de presencia corregida con ?on_conflict=username
+  const handleConfigureGroqKey = () => {
+    const val = prompt('Pegá tu API Key de Groq (gsk_...):', groqApiKey);
+    if (val !== null) {
+      const clean = val.trim();
+      setGroqApiKey(clean);
+      try { localStorage.setItem('nefa_groq_key', clean); } catch {}
+    }
+  };
+
   const syncPresence = useCallback(async (overrideTypingChannel?: string) => {
     if (!userName) return;
-    const typingChannel = typeof overrideTypingChannel === 'string'
-      ? overrideTypingChannel
-      : (isTypingRef.current ? currentChatId : '');
+    const typingChannel = typeof overrideTypingChannel === 'string' ? overrideTypingChannel : (isTypingRef.current ? currentChatId : '');
 
     try {
       await sbFetch('presence?on_conflict=username', 'POST', [{
@@ -245,9 +315,7 @@ export default function App() {
       }], { Prefer: 'resolution=merge-duplicates,return=minimal' });
 
       const list = await sbFetch('presence?select=*&order=username.asc');
-      if (Array.isArray(list)) {
-        setPresenceList(list);
-      }
+      if (Array.isArray(list)) setPresenceList(list);
     } catch {}
   }, [userName, myStatus, myCustomStatus, currentChatId]);
 
@@ -258,16 +326,22 @@ export default function App() {
         setChannels(data);
         setCurrentChatId(prev => data.some((c: Channel) => String(c.id) === String(prev)) ? prev : String(data[0].id));
       } else if (Array.isArray(data) && data.length === 0) {
-        // Si la tabla estaba vacía en Supabase, insertamos el canal general
         const initial = { id: 'gen-1', name: 'general', description: 'Coordinación general del equipo' };
         await sbFetch('channels', 'POST', [initial]);
         setChannels([initial]);
         setCurrentChatId('gen-1');
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      const msg = err instanceof Error ? err.message : 'Error';
       setDbError(`Error Canales: ${msg}`);
     }
+  }, []);
+
+  const fetchClients = useCallback(async () => {
+    try {
+      const data = await sbFetch('clients?select=*&order=created_at.desc');
+      if (Array.isArray(data)) setClients(data);
+    } catch {}
   }, []);
 
   const fetchMessages = useCallback(async (isInitial = false) => {
@@ -296,7 +370,7 @@ export default function App() {
         setMessages(data);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      const msg = err instanceof Error ? err.message : 'Error';
       setDbError(`Error Mensajes: ${msg}`);
     }
   }, [currentChatId, userName, playMsnNudgeEffect, playMsnMessageSound, flashTabTitle]);
@@ -304,6 +378,7 @@ export default function App() {
   useEffect(() => {
     if (!isLoggedIn) return;
     fetchChannels();
+    fetchClients();
     fetchMessages(true);
     syncPresence();
 
@@ -313,17 +388,17 @@ export default function App() {
       }
       fetchMessages(false);
       fetchChannels();
+      fetchClients();
       syncPresence();
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [isLoggedIn, currentChatId, fetchChannels, fetchMessages, syncPresence]);
+  }, [isLoggedIn, currentChatId, fetchChannels, fetchClients, fetchMessages, syncPresence]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+  }, [messages.length, isAiThinking]);
 
-  // Crear Canal compatible tanto con ID de texto como con ID numérico en Supabase
   const handleCreateChannel = async () => {
     if (!newChannelName.trim()) return;
     const cleanName = newChannelName.trim().toLowerCase().replace(/\s+/g, '-');
@@ -335,7 +410,6 @@ export default function App() {
       try {
         created = await sbFetch('channels', 'POST', [{ id: newId, name: cleanName, description: cleanDesc }]);
       } catch {
-        // Respaldo automático si la columna ID en Supabase aún es numérica (bigint)
         created = await sbFetch('channels', 'POST', [{ name: cleanName, description: cleanDesc }]);
       }
       const added = Array.isArray(created) && created[0] ? created[0] : { id: newId, name: cleanName, description: cleanDesc };
@@ -378,14 +452,13 @@ export default function App() {
     }
   };
 
-  // Borrar Canal: primero limpia sus mensajes para que Supabase no bloquee por Foreign Key
   const handleDeleteChannel = async (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (channels.length <= 1) {
       setDbError('Debe quedar al menos 1 canal activo.');
       return;
     }
-    if (!window.confirm(`¿Seguro que querés eliminar el canal #${name} y sus mensajes?`)) return;
+    if (!window.confirm(`¿Seguro que querés eliminar el canal #${name}?`)) return;
 
     try {
       await sbFetch(`messages?channel_id=eq.${encodeURIComponent(id)}`, 'DELETE');
@@ -401,8 +474,48 @@ export default function App() {
       setDbError(`No se pudo eliminar el canal: ${msg}`);
     }
   };
+
+  // Funciones Clientes
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientName.trim()) return;
+
+    const newClient: ClientRecord = {
+      id: `cli-${Date.now()}`,
+      name: clientName.trim(),
+      company: clientCompany.trim() || 'Particular',
+      shipment_status: clientStatus,
+      paid: parseFloat(clientPaid) || 0,
+      total_debt: parseFloat(clientDebt) || 0,
+      arrival_date: clientArrival.trim() || 'A definir',
+      notes: clientNotes.trim() || ''
+    };
+
+    try {
+      await sbFetch('clients', 'POST', [newClient]);
+      setClients(prev => [newClient, ...prev]);
+      setClientName('');
+      setClientCompany('');
+      setClientPaid('');
+      setClientDebt('');
+      setClientArrival('');
+      setClientNotes('');
+      setIsAddingClient(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error';
+      setDbError(`No se pudo guardar el cliente: ${msg}`);
+    }
+  };
+
+  const handleDeleteClient = async (id: string) => {
+    if (!window.confirm('¿Eliminar este registro de cliente y sus datos de envío?')) return;
+    try {
+      await sbFetch(`clients?id=eq.${encodeURIComponent(id)}`, 'DELETE');
+      setClients(prev => prev.filter(c => c.id !== id));
+    } catch {}
+  };
   const handleEditCustomStatus = () => {
-    const val = prompt('Escribí tu frase personal estilo MSN (ej. Cotizando embarque / En reunión):', myCustomStatus);
+    const val = prompt('Escribí tu frase personal estilo MSN:', myCustomStatus);
     if (val !== null) {
       const clean = val.trim();
       setMyCustomStatus(clean);
@@ -420,10 +533,7 @@ export default function App() {
     setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, type: newType } : m));
     try {
       await sbFetch(`messages?id=eq.${encodeURIComponent(msg.id)}`, 'PATCH', { type: newType });
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Error';
-      setDbError(`No se pudo fijar el mensaje: ${errMsg}`);
-    }
+    } catch {}
   };
 
   const handleToggleTask = async (msg: Message) => {
@@ -442,10 +552,7 @@ export default function App() {
     setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, text: updated } : m));
     try {
       await sbFetch(`messages?id=eq.${encodeURIComponent(msg.id)}`, 'PATCH', { text: updated });
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Error';
-      setDbError(`No se pudo actualizar la tarea: ${errMsg}`);
-    }
+    } catch {}
   };
 
   const insertTaskTemplate = () => {
@@ -453,6 +560,15 @@ export default function App() {
       setInputText(inputText.replace(/^\[ \]\s*/, ''));
     } else {
       setInputText(`[ ] ${inputText}`);
+    }
+    inputRef.current?.focus();
+  };
+
+  const insertAiPrompt = () => {
+    if (inputText.toLowerCase().startsWith('@nefa ')) {
+      setInputText(inputText.replace(/^@nefa\s+/i, ''));
+    } else {
+      setInputText(`@nefa ${inputText}`);
     }
     inputRef.current?.focus();
   };
@@ -487,10 +603,13 @@ export default function App() {
     const parts = text.split(/(@[\wáéíóúÁÉÍÓÚñÑ.-]+)/g);
     return parts.map((part, idx) => {
       if (part.startsWith('@') && part.length > 1) {
+        const isAiMention = part.toLowerCase() === '@nefa';
         return (
           <span
             key={idx}
-            className="bg-amber-400/25 text-amber-300 border border-amber-400/40 px-1.5 py-0.5 rounded-md font-bold"
+            className={`${
+              isAiMention ? 'bg-purple-500/30 text-purple-200 border-purple-400/50' : 'bg-amber-400/25 text-amber-300 border-amber-400/40'
+            } border px-1.5 py-0.5 rounded-md font-bold`}
           >
             {part}
           </span>
@@ -502,7 +621,6 @@ export default function App() {
 
   const triggerPoke = async () => {
     playMsnNudgeEffect();
-
     const newMessage: Message = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       channel_id: currentChatId,
@@ -511,15 +629,9 @@ export default function App() {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       type: 'poke'
     };
-
     lastProcessedMsgId.current = newMessage.id;
     setMessages(prev => [...prev, newMessage]);
-    try {
-      await sbFetch('messages', 'POST', [newMessage]);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error';
-      setDbError(`Error al enviar zumbido: ${msg}`);
-    }
+    try { await sbFetch('messages', 'POST', [newMessage]); } catch {}
   };
 
   const startCall = async (mode: 'voice' | 'video', announce = true) => {
@@ -538,11 +650,11 @@ export default function App() {
       };
       lastProcessedMsgId.current = newMessage.id;
       setMessages(prev => [...prev, newMessage]);
-      try {
-        await sbFetch('messages', 'POST', [newMessage]);
-      } catch {}
+      try { await sbFetch('messages', 'POST', [newMessage]); } catch {}
     }
   };
+
+  const activeChannel = channels.find(c => String(c.id) === String(currentChatId));
 
   const handleSendMessage = async (customType: string = 'text', textContent?: string) => {
     const rawContent = textContent ?? inputText;
@@ -577,6 +689,42 @@ export default function App() {
       const msg = err instanceof Error ? err.message : 'Error';
       setDbError(`No se guardó el mensaje: ${msg}`);
     }
+
+    if (customType === 'text' && /(?:^|\s)@nefa\b/i.test(rawContent)) {
+      let activeKey = groqApiKey.trim();
+      if (!activeKey) {
+        const entered = prompt('Pegá tu API Key de Groq (gsk_...) para @nefa:');
+        if (entered && entered.trim()) {
+          activeKey = entered.trim();
+          setGroqApiKey(activeKey);
+          try { localStorage.setItem('nefa_groq_key', activeKey); } catch {}
+        } else {
+          return;
+        }
+      }
+
+      const cleanPrompt = rawContent.replace(/@nefa\b/gi, '').trim() || 'Hola';
+      setIsAiThinking(true);
+      try {
+        const aiReply = await askGroqQwen(activeKey, cleanPrompt, [...messages, newMessage], activeChannel?.name || 'general', userName);
+        const botMsg: Message = {
+          id: `msg-${Date.now()}-ai`,
+          channel_id: currentChatId,
+          sender: '🤖 NEFA AI',
+          text: `❝ @${userName}: ${cleanPrompt.substring(0, 60)}\n${aiReply}`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          type: 'ai'
+        };
+        lastProcessedMsgId.current = botMsg.id;
+        setMessages(prev => [...prev, botMsg]);
+        await sbFetch('messages', 'POST', [botMsg]);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : 'Error';
+        setDbError(`Error IA: ${errMsg}`);
+      } finally {
+        setIsAiThinking(false);
+      }
+    }
   };
 
   const handleInputTyping = (val: string) => {
@@ -594,62 +742,36 @@ export default function App() {
     handleSendMessage('file', `📁 Archivo adjunto: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
   };
 
-  const activeChannel = channels.find(c => String(c.id) === String(currentChatId));
   const nowMs = Date.now();
-
-  // Unificamos los usuarios de la tabla `presence` + tú mismo + todos los que participaron en el chat
   const combinedRoster: PresenceUser[] = React.useMemo(() => {
     const map = new Map<string, PresenceUser>();
-
-    // 1. Usuarios registrados en la tabla presence
-    presenceList.forEach(p => {
-      if (p.username) map.set(p.username.toLowerCase(), p);
-    });
-
-    // 2. Asegurar que el usuario actual siempre figure activo con su estado actual
+    presenceList.forEach(p => { if (p.username) map.set(p.username.toLowerCase(), p); });
     if (userName) {
       map.set(userName.toLowerCase(), {
-        username: userName,
-        status: myStatus,
-        custom_status: myCustomStatus,
-        typing_in: isTypingRef.current ? currentChatId : '',
-        typing_at: new Date().toISOString(),
-        last_seen: new Date().toISOString(),
+        username: userName, status: myStatus, custom_status: myCustomStatus,
+        typing_in: isTypingRef.current ? currentChatId : '', typing_at: new Date().toISOString(), last_seen: new Date().toISOString(),
       });
     }
-
-    // 3. Agregar cualquier miembro del equipo que haya enviado mensajes recientes en el canal
     messages.forEach(m => {
-      if (m.sender && !map.has(m.sender.toLowerCase())) {
-        map.set(m.sender.toLowerCase(), {
-          username: m.sender,
-          status: 'online',
-          custom_status: '',
-          typing_in: '',
-          typing_at: m.created_at || new Date(0).toISOString(),
-          last_seen: m.created_at || new Date().toISOString(),
-        });
+      if (m.sender && m.sender !== '🤖 NEFA AI' && !map.has(m.sender.toLowerCase())) {
+        map.set(m.sender.toLowerCase(), { username: m.sender, status: 'online', custom_status: '', typing_in: '', typing_at: '', last_seen: new Date().toISOString() });
       }
     });
-
     return Array.from(map.values()).sort((a, b) => a.username.localeCompare(b.username));
   }, [presenceList, messages, userName, myStatus, myCustomStatus, currentChatId]);
 
   const onlineUsersCount = combinedRoster.filter(p => nowMs - new Date(p.last_seen).getTime() < 90000).length;
   const typingUsers = combinedRoster.filter(p => 
-    nowMs - new Date(p.last_seen).getTime() < 90000 &&
-    String(p.typing_in) === String(currentChatId) &&
-    nowMs - new Date(p.typing_at).getTime() < 6000 &&
-    p.username.toLowerCase() !== userName.toLowerCase()
+    nowMs - new Date(p.last_seen).getTime() < 90000 && String(p.typing_in) === String(currentChatId) &&
+    nowMs - new Date(p.typing_at).getTime() < 6000 && p.username.toLowerCase() !== userName.toLowerCase()
   ).map(p => p.username);
 
   const pinnedMessages = messages.filter(m => m.type === 'pinned');
-  const displayedMessages = searchQuery.trim()
-    ? messages.filter(m =>
-        (m.text || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (m.sender || '').toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : messages;
+  const displayedMessages = searchQuery.trim() ? messages.filter(m => (m.text || '').toLowerCase().includes(searchQuery.toLowerCase())) : messages;
+
+  const filteredClients = clientSearch.trim()
+    ? clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) || c.company.toLowerCase().includes(clientSearch.toLowerCase()))
+    : clients;
 
   const safeRoomName = `NEFA_Software_Room_${String(currentChatId).replace(/[^a-zA-Z0-9]/g, '_')}`;
   const jitsiUrl = `https://meet.jit.si/${safeRoomName}#userInfo.displayName="${encodeURIComponent(userName)}"&config.prejoinPageEnabled=false&config.startWithVideoMuted=${callType === 'voice'}&config.disableDeepLinking=true`;
@@ -662,35 +784,24 @@ export default function App() {
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">
               <Zap className="w-7 h-7" />
             </div>
-            <h1 className="text-xl font-bold tracking-wide">NEFA Software Chat</h1>
-            <p className="text-xs text-slate-400">Ingresa tu nombre para conectarte en vivo con el equipo</p>
+            <h1 className="text-xl font-bold tracking-wide">NEFA Software Workspace</h1>
+            <p className="text-xs text-slate-400">Ingresa tu nombre para entrar al sistema</p>
           </div>
-
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">Tu Nombre:</label>
               <input 
-                type="text" 
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
+                type="text" value={userName} onChange={(e) => setUserName(e.target.value)}
                 placeholder="Ej. Franco, Ariel, Melany..."
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 outline-none focus:border-blue-500"
               />
             </div>
-
-            <button 
-              type="submit"
-              onClick={() => handleLogin()}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
-            >
-              Entrar al Chat <ArrowRight className="w-4 h-4" />
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg cursor-pointer">
+              Entrar al Sistema <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
           <div className="pt-2 border-t border-slate-800 text-center">
-            <a href="/ipad/index.html" className="text-[11px] text-slate-400 hover:text-blue-400 underline">
-              Versión ligera para iPad 2 (iOS 9) →
-            </a>
+            <a href="/ipad/index.html" className="text-[11px] text-slate-400 hover:text-blue-400 underline">Versión ligera para iPad 2 →</a>
           </div>
         </div>
       </div>
@@ -699,598 +810,517 @@ export default function App() {
 
   return (
     <div className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} h-[100dvh] w-screen flex flex-col overflow-hidden font-sans ${isShaking ? 'msn-buzz-active' : ''}`}>
-      
       <style>{`
         @keyframes msn-nudge {
-          0% { transform: translate(0, 0) rotate(0deg); }
-          5% { transform: translate(-16px, -12px) rotate(-2.5deg); }
-          10% { transform: translate(16px, 10px) rotate(2.5deg); }
-          15% { transform: translate(-18px, 12px) rotate(-2deg); }
-          20% { transform: translate(18px, -12px) rotate(2deg); }
-          25% { transform: translate(-16px, -10px) rotate(-2.5deg); }
-          30% { transform: translate(16px, 14px) rotate(2.5deg); }
-          35% { transform: translate(-14px, 10px) rotate(-1.5deg); }
-          40% { transform: translate(14px, -14px) rotate(1.5deg); }
-          45% { transform: translate(-16px, -8px) rotate(-2deg); }
-          50% { transform: translate(16px, 12px) rotate(2deg); }
-          55% { transform: translate(-12px, 10px) rotate(-1.5deg); }
-          60% { transform: translate(12px, -10px) rotate(1.5deg); }
-          65% { transform: translate(-10px, -8px) rotate(-1deg); }
-          70% { transform: translate(10px, 8px) rotate(1deg); }
-          75% { transform: translate(-8px, 6px) rotate(-1deg); }
-          80% { transform: translate(8px, -6px) rotate(1deg); }
-          85% { transform: translate(-6px, -4px) rotate(-0.5deg); }
-          90% { transform: translate(6px, 4px) rotate(0.5deg); }
-          95% { transform: translate(-4px, 2px) rotate(0deg); }
-          100% { transform: translate(0, 0) rotate(0deg); }
+          0%, 100% { transform: translate(0, 0); }
+          20% { transform: translate(-16px, -12px); }
+          40% { transform: translate(16px, 12px); }
+          60% { transform: translate(-14px, 10px); }
+          80% { transform: translate(14px, -10px); }
         }
-        .msn-buzz-active {
-          animation: msn-nudge 0.85s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-        }
+        .msn-buzz-active { animation: msn-nudge 0.8s ease-in-out both; }
       `}</style>
 
       {dbError && (
         <div className="bg-red-600 text-white px-4 py-2 text-xs flex items-center justify-between z-50 shrink-0">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{dbError}</span>
-          </div>
+          <div className="flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" /><span>{dbError}</span></div>
           <button onClick={() => setDbError(null)} className="underline ml-2">Cerrar</button>
         </div>
       )}
 
-      <div className="flex-1 flex h-full w-full relative overflow-hidden">
-
-        {sidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-black/60 z-30 md:hidden" 
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-
-        {/* SIDEBAR DE CANALES + EQUIPO EN LÍNEA */}
-        <div className={`fixed md:static inset-y-0 left-0 z-40 w-72 sm:w-80 flex flex-col border-r transition-transform duration-200 ease-in-out ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        } ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
-          
-          <div className={`p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex items-center justify-between`}>
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold shadow">
-                N
-              </div>
-              <div>
-                <h1 className="font-bold text-sm">NEFA Software</h1>
-                <p className="text-[10px] text-emerald-400">● En vivo ({userName})</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-1">
-              <button 
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className={`p-2 rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
-                title="Activar/Silenciar sonidos MSN"
-              >
-                {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
-              </button>
-              <button 
-                onClick={() => setDarkMode(!darkMode)}
-                className={`p-2 rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-800 text-yellow-400' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
-              >
-                {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
-              <button 
-                onClick={() => setSidebarOpen(false)}
-                className="p-2 rounded-xl md:hidden text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-            {/* CANALES */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between px-2 mb-2">
-                <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Canales</span>
-                <button 
-                  onClick={() => setIsAddingChannel(!isAddingChannel)}
-                  className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Nuevo
-                </button>
-              </div>
-
-              {isAddingChannel && (
-                <div className={`p-3 rounded-xl border mb-3 space-y-2 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-300'}`}>
-                  <input
-                    type="text"
-                    placeholder="Nombre del canal (ej. ventas)"
-                    value={newChannelName}
-                    onChange={(e) => setNewChannelName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateChannel()}
-                    autoFocus
-                    className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Descripción corta"
-                    value={newChannelDesc}
-                    onChange={(e) => setNewChannelDesc(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateChannel()}
-                    className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
-                  />
-                  <div className="flex justify-end gap-2 pt-1">
-                    <button onClick={() => setIsAddingChannel(false)} className="text-xs text-slate-400 px-2 py-1">Cancelar</button>
-                    <button onClick={handleCreateChannel} className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded-lg font-semibold">Crear Canal</button>
-                  </div>
-                </div>
-              )}
-
-              {channels.map(ch => (
-                <div
-                  key={ch.id}
-                  onClick={() => { setCurrentChatId(String(ch.id)); setSidebarOpen(false); setReplyingTo(null); setSearchQuery(''); }}
-                  className={`group w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
-                    String(currentChatId) === String(ch.id) 
-                      ? (darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-50 text-blue-700 border border-blue-200') 
-                      : (darkMode ? 'text-slate-300 hover:bg-slate-800/60' : 'text-slate-700 hover:bg-slate-100')
-                  }`}
-                >
-                  {editingChannelId === String(ch.id) ? (
-                    <div className="flex-1 space-y-1.5 mr-2" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="text"
-                        value={editChannelName}
-                        onChange={(e) => setEditChannelName(e.target.value)}
-                        className="w-full px-2 py-1 text-xs rounded bg-slate-950 border border-blue-500 text-white outline-none"
-                      />
-                      <input
-                        type="text"
-                        value={editChannelDesc}
-                        onChange={(e) => setEditChannelDesc(e.target.value)}
-                        placeholder="Descripción"
-                        className="w-full px-2 py-1 text-[10px] rounded bg-slate-950 border border-slate-700 text-slate-300 outline-none"
-                      />
-                      <div className="flex gap-2 pt-1">
-                        <button onClick={(e) => handleSaveChannelEdit(String(ch.id), e)} className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
-                          <Check className="w-3 h-3" /> Guardar
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); setEditingChannelId(null); }} className="text-slate-400 text-[10px]">
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2.5 truncate pr-2">
-                        <Hash className="w-4 h-4 opacity-70 shrink-0" />
-                        <div className="truncate">
-                          <p className="text-xs font-semibold truncate">{ch.name}</p>
-                          {ch.description && <p className="text-[10px] opacity-60 truncate">{ch.description}</p>}
-                        </div>
-                      </div>
-                      {/* Botones de editar y eliminar siempre visibles */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button 
-                          onClick={(e) => startEditingChannel(ch, e)}
-                          className="p-1.5 hover:bg-slate-700/50 rounded-lg text-slate-400 hover:text-white"
-                          title="Renombrar canal"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        {channels.length > 1 && (
-                          <button 
-                            onClick={(e) => handleDeleteChannel(String(ch.id), ch.name, e)}
-                            className="p-1.5 hover:bg-red-500/20 rounded-lg text-slate-400 hover:text-red-400"
-                            title="Eliminar canal"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* EQUIPO EN LÍNEA (TODOS LOS MIEMBROS CONECTADOS Y RECIENTES) */}
-            <div className={`space-y-1.5 pt-3 border-t ${darkMode ? 'border-slate-800/70' : 'border-slate-200'}`}>
-              <div className="flex items-center justify-between px-2">
-                <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Equipo en línea</span>
-                <span className="text-[10px] font-bold text-emerald-400">
-                  {onlineUsersCount} {onlineUsersCount === 1 ? 'activo' : 'activos'}
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                {combinedRoster.map((p) => {
-                  const isOnline = nowMs - new Date(p.last_seen).getTime() < 90000;
-                  const dotColor = !isOnline
-                    ? 'bg-slate-600 opacity-50'
-                    : p.status === 'away'
-                    ? 'bg-amber-500 shadow-sm shadow-amber-500/50'
-                    : p.status === 'busy'
-                    ? 'bg-red-500 shadow-sm shadow-red-500/50'
-                    : 'bg-emerald-500 shadow-sm shadow-emerald-500/50';
-
-                  const statusLabel = !isOnline
-                    ? ' (Desconectado)'
-                    : p.status === 'away'
-                    ? ' (Ausente)'
-                    : p.status === 'busy'
-                    ? ' (Ocupado)'
-                    : '';
-
-                  return (
-                    <div
-                      key={p.username}
-                      onClick={() => {
-                        const short = p.username.split(' ')[0];
-                        setInputText(prev => `${prev}@${short} `);
-                        setSidebarOpen(false);
-                        inputRef.current?.focus();
-                      }}
-                      title="Tocá para mencionar con @"
-                      className="px-2.5 py-1.5 rounded-xl flex items-center gap-2.5 cursor-pointer hover:bg-slate-800/40"
-                    >
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
-                      <div className="truncate flex-1">
-                        <p className="text-xs font-semibold truncate">
-                          {p.username} <span className="text-[10px] font-normal opacity-60">{statusLabel}</span>
-                        </p>
-                        {p.custom_status && (
-                          <p className="text-[10px] text-slate-400 italic truncate">“{p.custom_status}”</p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* FOOTER PERFIL MSN */}
-          <div className={`p-3 border-t ${darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'} space-y-2`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5 truncate">
-                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                  {userName.substring(0, 2).toUpperCase()}
-                </div>
-                <div className="truncate">
-                  <p className="text-xs font-bold truncate">{userName}</p>
-                  <p 
-                    onClick={handleEditCustomStatus}
-                    className="text-[10px] text-blue-400 hover:underline cursor-pointer truncate max-w-[155px]"
-                  >
-                    {myCustomStatus ? `“${myCustomStatus}”` : '✏️ Escribir frase personal...'}
-                  </p>
-                </div>
-              </div>
-              <button onClick={handleLogout} className="text-xs text-red-400 hover:underline px-2 py-1">
-                Cambiar
-              </button>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <select
-                value={myStatus}
-                onChange={(e) => handleChangeStatus(e.target.value as 'online' | 'away' | 'busy')}
-                className={`flex-1 text-[11px] px-2 py-1.5 rounded-lg border outline-none cursor-pointer ${
-                  darkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-300 text-slate-800'
-                }`}
-              >
-                <option value="online">🟢 Conectado</option>
-                <option value="away">🟠 Ausente (Vuelvo enseguida)</option>
-                <option value="busy">🔴 Ocupado (No molestar)</option>
-              </select>
-              <button
-                onClick={handleEditCustomStatus}
-                className={`px-2.5 py-1.5 text-[11px] rounded-lg border flex items-center gap-1 ${
-                  darkMode ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700'
-                }`}
-              >
-                <MessageSquare className="w-3 h-3" /> Frase
-              </button>
-            </div>
-          </div>
+      {/* BARRA SUPERIOR DE PESTAÑAS (CHAT VS CLIENTES) */}
+      <div className={`h-12 px-4 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0`}>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold text-xs">N</div>
+          <span className="font-bold text-sm tracking-wide">NEFA Software</span>
         </div>
-
-        {/* ÁREA DE CHAT PRINCIPAL */}
-        <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
-          
-          <div className={`h-14 sm:h-16 px-3 sm:px-6 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0 gap-2`}>
-            <div className="flex items-center gap-2.5 truncate">
-              <button 
-                onClick={() => setSidebarOpen(true)}
-                className={`p-2 rounded-xl border md:hidden ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              <div className="truncate">
-                <h2 className="font-bold text-sm sm:text-base truncate">
-                  # {activeChannel?.name || 'general'}
-                </h2>
-                <p className={`text-[10px] sm:text-xs truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {activeChannel?.description || 'Canal de comunicación en vivo'}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-1.5 shrink-0">
-              {searchOpen ? (
-                <div className={`flex items-center rounded-xl border px-2.5 py-1.5 ${darkMode ? 'bg-slate-950 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>
-                  <Search className="w-3.5 h-3.5 text-slate-400 mr-1.5" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar en el canal..."
-                    autoFocus
-                    className="bg-transparent outline-none text-xs w-28 sm:w-44"
-                  />
-                  <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} className="text-slate-400 hover:text-white ml-1">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <button 
-                  onClick={() => setSearchOpen(true)} 
-                  className={`p-2.5 rounded-xl border transition-colors ${darkMode ? 'border-slate-800 bg-slate-800/50 text-slate-300 hover:text-white' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
-                  title="Buscar mensajes"
-                >
-                  <Search className="w-4 h-4" />
-                </button>
-              )}
-
-              <button 
-                onClick={() => startCall('voice', true)} 
-                className={`p-2.5 rounded-xl border transition-colors ${darkMode ? 'border-slate-800 bg-slate-800/50 hover:bg-emerald-600/20 hover:border-emerald-500/40 text-slate-300 hover:text-emerald-400' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
-                title="Iniciar llamada de voz"
-              >
-                <Phone className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => startCall('video', true)} 
-                className={`p-2.5 rounded-xl border transition-colors ${darkMode ? 'border-slate-800 bg-slate-800/50 hover:bg-blue-600/20 hover:border-blue-500/40 text-slate-300 hover:text-blue-400' : 'border-slate-200 bg-slate-100 text-slate-700'}`}
-                title="Iniciar videollamada"
-              >
-                <Video className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* BARRA DE MENSAJES FIJADOS */}
-          {pinnedMessages.length > 0 && (
-            <div className={`px-3 sm:px-6 py-2 border-b flex items-center justify-between gap-2 text-xs shrink-0 ${
-              darkMode ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900'
-            }`}>
-              <div className="flex items-center gap-2 truncate">
-                <Pin className="w-3.5 h-3.5 text-amber-400 shrink-0 rotate-45" />
-                <div className="truncate">
-                  <span className="font-bold mr-1.5">Fijado ({pinnedMessages[pinnedMessages.length - 1].sender}):</span>
-                  <span className="opacity-90">{(pinnedMessages[pinnedMessages.length - 1].text || '').replace(/^❝ [^\n]+\n/, '')}</span>
-                </div>
-              </div>
-              <button
-                onClick={() => handleTogglePin(pinnedMessages[pinnedMessages.length - 1])}
-                className="text-[10px] underline opacity-75 hover:opacity-100 shrink-0"
-              >
-                Desfijar
-              </button>
-            </div>
-          )}
-
-          {/* Lista de Mensajes */}
-          <div className={`flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 ${darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
-            {displayedMessages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center opacity-50 text-xs">
-                <Hash className="w-8 h-8 mb-2 stroke-1" />
-                <p>{searchQuery ? `Sin resultados para "${searchQuery}"` : `No hay mensajes en #${activeChannel?.name}.`}</p>
-              </div>
-            ) : (
-              displayedMessages.map((msg) => {
-                const isMe = msg.sender.toLowerCase() === userName.toLowerCase();
-                const isPinned = msg.type === 'pinned';
-                const parsed = parseMessageBody(msg.text);
-
-                return (
-                  <div key={msg.id} className={`group flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                    {!isMe && <span className="text-[11px] font-bold mb-1 ml-1 text-blue-400">{msg.sender}</span>}
-                    
-                    {msg.type === 'poke' ? (
-                      <div className="my-1.5 px-4 py-2 bg-amber-500/20 border-2 border-amber-500 text-amber-400 rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-lg shadow-amber-500/10">
-                        <BellRing className="w-4 h-4 animate-ping" />
-                        <span>¡{msg.sender} ha enviado un Zumbido! ⚡ ({msg.time})</span>
-                      </div>
-                    ) : msg.type === 'call' ? (
-                      <div className="my-1.5 p-3.5 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 rounded-2xl text-xs flex flex-col sm:flex-row items-start sm:items-center gap-3 shadow-lg">
-                        <div className="flex items-center gap-2.5">
-                          <div className="p-2 bg-emerald-500 text-slate-950 rounded-xl animate-pulse">
-                            <PhoneCall className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="font-bold text-white">{msg.sender} {msg.text}</p>
-                            <p className="text-[10px] text-emerald-400">Sala de #{activeChannel?.name} • {msg.time}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => startCall('video', false)}
-                          className="w-full sm:w-auto px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition-transform active:scale-95 text-center"
-                        >
-                          Unirse ahora
-                        </button>
-                      </div>
-                    ) : (
-                      <div className={`flex items-center gap-1.5 max-w-[90%] sm:max-w-md ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                        <div className={`rounded-2xl px-3.5 py-2.5 shadow-sm relative ${
-                          isPinned ? 'ring-2 ring-amber-400/70 ' : ''
-                        }${
-                          isMe 
-                            ? 'bg-blue-600 text-white rounded-br-none' 
-                            : darkMode ? 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-none' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
-                        }`}>
-                          {parsed.quoteHeader && (
-                            <div className={`text-[11px] mb-1.5 px-2.5 py-1 rounded-lg border-l-2 ${
-                              isMe ? 'bg-blue-700/60 border-blue-200 text-blue-100' : 'bg-slate-800/80 border-blue-400 text-slate-300'
-                            }`}>
-                              {parsed.quoteHeader}
-                            </div>
-                          )}
-
-                          {parsed.isTask ? (
-                            <div
-                              onClick={() => handleToggleTask(msg)}
-                              className="flex items-start gap-2 cursor-pointer select-none py-0.5"
-                            >
-                              {parsed.isTaskChecked ? (
-                                <CheckSquare className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5" />
-                              ) : (
-                                <Square className="w-4 h-4 opacity-80 shrink-0 mt-0.5" />
-                              )}
-                              <span className={`text-xs sm:text-sm leading-relaxed break-words ${parsed.isTaskChecked ? 'line-through opacity-75' : 'font-medium'}`}>
-                                {renderFormattedText(parsed.cleanTaskText)}
-                              </span>
-                            </div>
-                          ) : (
-                            <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words">
-                              {renderFormattedText(parsed.mainText)}
-                            </p>
-                          )}
-
-                          <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${isMe ? 'text-blue-100' : 'opacity-60'}`}>
-                            {isPinned && <Pin className="w-3 h-3 text-amber-300 mr-0.5" />}
-                            <span>{msg.time}</span>
-                            {isMe && <CheckCheck className="w-3.5 h-3.5" />}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-0.5 opacity-80 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                          <button
-                            onClick={() => handleStartReply(msg)}
-                            className={`p-1.5 rounded-lg border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-white border-slate-200 text-slate-600'}`}
-                            title="Responder mensaje"
-                          >
-                            <Reply className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleTogglePin(msg)}
-                            className={`p-1.5 rounded-lg border ${
-                              isPinned
-                                ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
-                                : darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-amber-400' : 'bg-white border-slate-200 text-slate-600'
-                            }`}
-                            title={isPinned ? 'Desfijar mensaje' : 'Fijar mensaje en el canal'}
-                          >
-                            <Pin className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {typingUsers.length > 0 && (
-            <div className={`px-4 py-1 text-[11px] italic text-blue-400 ${darkMode ? 'bg-slate-950' : 'bg-slate-50'} shrink-0`}>
-              💬 {typingUsers.join(', ')} está escribiendo...
-            </div>
-          )}
-
-          {replyingTo && (
-            <div className={`px-4 py-2 border-t flex items-center justify-between text-xs shrink-0 ${
-              darkMode ? 'bg-slate-900/90 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
-            }`}>
-              <div className="flex items-center gap-2 truncate">
-                <Reply className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span className="font-bold text-blue-400">Respondiendo a {replyingTo.sender}:</span>
-                <span className="truncate opacity-80">{(replyingTo.text || '').replace(/^❝ [^\n]+\n/, '')}</span>
-              </div>
-              <button onClick={() => setReplyingTo(null)} className="text-slate-400 hover:text-white ml-2">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          {/* Barra de Entrada */}
-          <div className={`p-2.5 sm:p-4 border-t ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <label className={`p-2.5 sm:p-3 rounded-xl border cursor-pointer shrink-0 ${darkMode ? 'border-slate-800 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'}`} title="Adjuntar archivo">
-                <Paperclip className="w-4 h-4" />
-                <input type="file" onChange={handleFileUpload} className="hidden" />
-              </label>
-
-              <button 
-                onClick={insertTaskTemplate}
-                className={`p-2.5 sm:p-3 rounded-xl border transition-colors shrink-0 ${
-                  inputText.startsWith('[ ] ')
-                    ? 'bg-emerald-600 border-emerald-500 text-white'
-                    : darkMode ? 'border-slate-800 bg-slate-800 text-emerald-400 hover:bg-slate-700' : 'border-slate-200 bg-slate-100 text-emerald-600'
-                }`}
-                title="Crear tarea / checklist interactivo"
-              >
-                <CheckSquare className="w-4 h-4" />
-              </button>
-
-              <button 
-                onClick={triggerPoke}
-                className="p-2.5 sm:p-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl shadow-md transition-transform active:scale-90 font-bold shrink-0"
-                title="Enviar Zumbido MSN"
-              >
-                <BellRing className="w-4 h-4" />
-              </button>
-              
-              <div className={`flex-1 flex items-center rounded-xl border px-3 py-2.5 ${darkMode ? 'bg-slate-950 border-slate-800 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
-                <input 
-                  ref={inputRef}
-                  type="text" 
-                  placeholder={`Mensaje o @mención en #${activeChannel?.name || 'canal'}...`}
-                  value={inputText}
-                  onChange={(e) => handleInputTyping(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage('text')}
-                  className="w-full bg-transparent border-none outline-none text-xs sm:text-sm"
-                />
-              </div>
-
-              <button 
-                onClick={() => handleSendMessage('text')}
-                className="p-2.5 sm:p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md transition-all shrink-0"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+        <div className="flex items-center gap-1 bg-slate-950/40 p-1 rounded-xl border border-slate-800">
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'chat' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5" /> Chat en Vivo
+          </button>
+          <button
+            onClick={() => setActiveTab('clients')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'clients' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" /> Clientes y Envíos ({clients.length})
+          </button>
         </div>
       </div>
 
-      {/* SALA DE LLAMADA / VIDEOLLAMADA EN VIVO */}
+      {/* VISTA 1: APARTADO DE CLIENTES Y ENVÍOS */}
+      {activeTab === 'clients' ? (
+        <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Gestión de Clientes y Envíos</h1>
+              <p className="text-xs text-slate-400">Control de estados, pagos, deudas y fechas estimados de llegada.</p>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className={`flex items-center rounded-xl border px-3 py-2 flex-1 sm:w-64 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-300'}`}>
+                <Search className="w-4 h-4 text-slate-400 mr-2" />
+                <input
+                  type="text" value={clientSearch} onChange={(e) => setClientSearch(e.target.value)}
+                  placeholder="Buscar por cliente o empresa..."
+                  className="bg-transparent border-0 outline-none text-xs w-full"
+                />
+              </div>
+              <button
+                onClick={() => setIsAddingClient(!isAddingClient)}
+                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Nuevo Cliente
+              </button>
+            </div>
+          </div>
+
+          {/* FORMULARIO NUEVO CLIENTE */}
+          {isAddingClient && (
+            <form onSubmit={handleCreateClient} className={`p-6 rounded-2xl border space-y-4 ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-slate-300'}`}>
+              <h2 className="text-sm font-bold text-blue-400">Registrar Nuevo Cliente / Envío</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nombre del Cliente:</label>
+                  <input
+                    type="text" required value={clientName} onChange={(e) => setClientName(e.target.value)}
+                    placeholder="Ej. Juan Pérez"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Empresa / Proyecto:</label>
+                  <input
+                    type="text" value={clientCompany} onChange={(e) => setClientCompany(e.target.value)}
+                    placeholder="Ej. Importadora Sur S.A."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Estado del Envío:</label>
+                  <select
+                    value={clientStatus} onChange={(e) => setClientStatus(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="En origen (China)">📦 En origen (China)</option>
+                    <option value="En Tránsito Marítimo/Aéreo">🚢 En Tránsito</option>
+                    <option value="En Aduana">🛃 En Aduana</option>
+                    <option value="Listo para Retirar">✅ Listo para Retirar</option>
+                    <option value="Entregado">🎉 Entregado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Fecha Estimada de Llegada:</label>
+                  <input
+                    type="text" value={clientArrival} onChange={(e) => setClientArrival(e.target.value)}
+                    placeholder="Ej. 25 de Noviembre"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Cuánto Pagó ($):</label>
+                  <input
+                    type="number" step="0.01" value={clientPaid} onChange={(e) => setClientPaid(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Cuánto Debe ($):</label>
+                  <input
+                    type="number" step="0.01" value={clientDebt} onChange={(e) => setClientDebt(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Notas / Observaciones (Tracking, CBM, Mercadería):</label>
+                  <input
+                    type="text" value={clientNotes} onChange={(e) => setClientNotes(e.target.value)}
+                    placeholder="Ej. 4.5 CBM - Contenedor 40ft - Factura #1042"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsAddingClient(false)} className="px-4 py-2 text-xs text-slate-400 hover:text-white">Cancelar</button>
+                <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-xl text-xs font-semibold shadow cursor-pointer">Guardar Cliente</button>
+              </div>
+            </form>
+          )}
+
+          {/* TABLA DE CLIENTES */}
+          <div className={`rounded-2xl border overflow-hidden ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-300'}`}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className={`border-b text-[11px] uppercase tracking-wider ${darkMode ? 'border-slate-800 bg-slate-950/60 text-slate-400' : 'border-slate-200 bg-slate-100 text-slate-600'}`}>
+                    <th className="p-3.5">Cliente / Empresa</th>
+                    <th className="p-3.5">Estado del Envío</th>
+                    <th className="p-3.5">Pagó ($)</th>
+                    <th className="p-3.5">Debe ($)</th>
+                    <th className="p-3.5">Llegada Est.</th>
+                    <th className="p-3.5">Notas / CBM</th>
+                    <th className="p-3.5 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-xs">
+                  {filteredClients.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-500">No hay clientes cargados todavía.</td>
+                    </tr>
+                  ) : (
+                    filteredClients.map(c => {
+                      const isPaidOff = c.total_debt <= 0;
+                      return (
+                        <tr key={c.id} className={`transition-colors ${darkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'}`}>
+                          <td className="p-3.5">
+                            <div className="font-bold">{c.name}</div>
+                            <div className="text-[10px] text-slate-400">{c.company}</div>
+                          </td>
+                          <td className="p-3.5">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                              {c.shipment_status}
+                            </span>
+                          </td>
+                          <td className="p-3.5 font-semibold text-emerald-400">${Number(c.paid).toLocaleString()}</td>
+                          <td className="p-3.5 font-semibold">
+                            {Number(c.total_debt) > 0 ? (
+                              <span className="text-red-400">${Number(c.total_debt).toLocaleString()}</span>
+                            ) : (
+                              <span className="text-emerald-400">Al día ✓</span>
+                            )}
+                          </td>
+                          <td className="p-3.5 text-slate-300">{c.arrival_date}</td>
+                          <td className="p-3.5 text-slate-400 max-w-xs truncate">{c.notes || 'Sin notas'}</td>
+                          <td className="p-3.5 text-right">
+                            <button
+                              onClick={() => handleDeleteClient(c.id)}
+                              className="p-1.5 hover:bg-red-500/20 rounded-lg text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+                              title="Eliminar cliente"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : (
+
+        /* VISTA 2: CHAT EN VIVO Y ASISTENTE IA */
+        <div className="flex-1 flex h-full w-full relative overflow-hidden">
+          {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />}
+
+          {/* SIDEBAR */}
+          <div className={`fixed md:static inset-y-0 left-0 z-40 w-72 sm:w-80 flex flex-col border-r transition-transform duration-200 ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+          } ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
+            
+            <div className={`p-4 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'} flex items-center justify-between`}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold shadow">N</div>
+                <div>
+                  <h1 className="font-bold text-sm">NEFA Software</h1>
+                  <p className="text-[10px] text-emerald-400">● En vivo ({userName})</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={handleConfigureGroqKey} className={`p-2 rounded-xl border ${groqApiKey ? 'border-purple-500/40 bg-purple-500/15 text-purple-300' : 'border-slate-700 bg-slate-800 text-slate-400'}`} title="Configurar API Key de Groq">
+                  <Bot className="w-4 h-4" />
+                </button>
+                <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-200" title="Sonido MSN">
+                  {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
+                </button>
+                <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-xl border border-slate-700 bg-slate-800 text-yellow-400">
+                  {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </button>
+                <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-xl md:hidden text-slate-400"><X className="w-5 h-5" /></button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+              {/* CANALES */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between px-2 mb-2">
+                  <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Canales</span>
+                  <button onClick={() => setIsAddingChannel(!isAddingChannel)} className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold cursor-pointer">
+                    <Plus className="w-3.5 h-3.5" /> Nuevo
+                  </button>
+                </div>
+
+                {isAddingChannel && (
+                  <div className={`p-3 rounded-xl border mb-3 space-y-2 ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-300'}`}>
+                    <input
+                      type="text" placeholder="Nombre canal (ej. aduana)" value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateChannel()} autoFocus
+                      className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
+                    />
+                    <input
+                      type="text" placeholder="Descripción corta" value={newChannelDesc} onChange={(e) => setNewChannelDesc(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateChannel()}
+                      className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-slate-700 outline-none focus:border-blue-500"
+                    />
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button onClick={() => setIsAddingChannel(false)} className="text-xs text-slate-400 px-2 py-1">Cancelar</button>
+                      <button onClick={handleCreateChannel} className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg font-semibold">Crear</button>
+                    </div>
+                  </div>
+                )}
+
+                {channels.map(ch => (
+                  <div
+                    key={ch.id}
+                    onClick={() => { setCurrentChatId(String(ch.id)); setSidebarOpen(false); setReplyingTo(null); setSearchQuery(''); }}
+                    className={`group w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
+                      String(currentChatId) === String(ch.id) ? 'bg-blue-600/25 text-blue-400 border border-blue-500/40 font-bold' : 'text-slate-300 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    {editingChannelId === String(ch.id) ? (
+                      <div className="flex-1 space-y-1.5 mr-2" onClick={(e) => e.stopPropagation()}>
+                        <input type="text" value={editChannelName} onChange={(e) => setEditChannelName(e.target.value)} className="w-full px-2 py-1 text-xs rounded bg-slate-950 border border-blue-500 text-white outline-none" />
+                        <div className="flex gap-2 pt-1">
+                          <button onClick={(e) => handleSaveChannelEdit(String(ch.id), e)} className="bg-emerald-600 text-white px-2 py-0.5 rounded text-[10px]">Guardar</button>
+                          <button onClick={(e) => { e.stopPropagation(); setEditingChannelId(null); }} className="text-slate-400 text-[10px]">Cancelar</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2.5 truncate pr-2">
+                          <Hash className="w-4 h-4 opacity-70 shrink-0" />
+                          <div className="truncate"><p className="text-xs font-semibold truncate">{ch.name}</p></div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={(e) => startEditingChannel(ch, e)} className="p-1 hover:bg-slate-700/50 rounded text-slate-400 hover:text-white" title="Editar"><Edit2 className="w-3.5 h-3.5" /></button>
+                          {channels.length > 1 && (
+                            <button onClick={(e) => handleDeleteChannel(String(ch.id), ch.name, e)} className="p-1 hover:bg-red-500/20 rounded text-slate-400 hover:text-red-400" title="Eliminar"><Trash2 className="w-3.5 h-3.5" /></button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* EQUIPO EN LÍNEA + @NEFA */}
+              <div className="space-y-1.5 pt-3 border-t border-slate-800">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Equipo en línea</span>
+                  <span className="text-[10px] font-bold text-emerald-400">{onlineUsersCount} activos</span>
+                </div>
+
+                <div onClick={insertAiPrompt} className="px-2.5 py-2 rounded-xl flex items-center gap-2.5 cursor-pointer border bg-purple-950/30 border-purple-500/30 hover:bg-purple-900/40 text-purple-200">
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-400 animate-pulse shrink-0" />
+                  <div className="truncate flex-1">
+                    <p className="text-xs font-bold flex items-center gap-1">🤖 @nefa <span className="text-[10px] font-normal opacity-75">(Asistente IA)</span></p>
+                    <p className="text-[10px] opacity-75 truncate">Consultas logísticas y de comercio exterior</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  {combinedRoster.map((p) => {
+                    const isOnline = nowMs - new Date(p.last_seen).getTime() < 90000;
+                    const dotColor = !isOnline ? 'bg-slate-600 opacity-50' : p.status === 'away' ? 'bg-amber-500' : p.status === 'busy' ? 'bg-red-500' : 'bg-emerald-500';
+                    return (
+                      <div key={p.username} onClick={() => { setInputText(prev => `${prev}@${p.username.split(' ')[0]} `); setSidebarOpen(false); inputRef.current?.focus(); }} className="px-2.5 py-1.5 rounded-xl flex items-center gap-2.5 cursor-pointer hover:bg-slate-800/40">
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
+                        <div className="truncate flex-1">
+                          <p className="text-xs font-semibold truncate">{p.username}</p>
+                          {p.custom_status && <p className="text-[10px] text-slate-400 italic truncate">“{p.custom_status}”</p>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* FOOTER PERFIL */}
+            <div className={`p-3 border-t ${darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-slate-200 bg-slate-50'} space-y-2`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 truncate">
+                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">{userName.substring(0, 2).toUpperCase()}</div>
+                  <div className="truncate">
+                    <p className="text-xs font-bold truncate">{userName}</p>
+                    <p onClick={handleEditCustomStatus} className="text-[10px] text-blue-400 hover:underline cursor-pointer truncate max-w-[140px]">{myCustomStatus ? `“${myCustomStatus}”` : '✏️ Frase personal...'}</p>
+                  </div>
+                </div>
+                <button onClick={handleLogout} className="text-xs text-red-400 hover:underline px-2 py-1">Salir</button>
+              </div>
+              <select value={myStatus} onChange={(e) => handleChangeStatus(e.target.value as 'online' | 'away' | 'busy')} className="w-full text-[11px] px-2 py-1.5 rounded-lg border bg-slate-900 border-slate-700 text-slate-200 cursor-pointer outline-none">
+                <option value="online">🟢 Conectado</option>
+                <option value="away">🟠 Ausente</option>
+                <option value="busy">🔴 Ocupado</option>
+              </select>
+            </div>
+          </div>
+
+          {/* CHAT PRINCIPAL */}
+          <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
+            <div className={`h-14 sm:h-16 px-3 sm:px-6 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0 gap-2`}>
+              <div className="flex items-center gap-2.5 truncate">
+                <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-xl border md:hidden bg-slate-800 text-slate-200"><Menu className="w-5 h-5" /></button>
+                <div className="truncate">
+                  <h2 className="font-bold text-sm sm:text-base truncate"># {activeChannel?.name || 'general'}</h2>
+                  <p className="text-[10px] sm:text-xs text-slate-400 truncate">{activeChannel?.description || 'Canal de equipo'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {searchOpen ? (
+                  <div className={`flex items-center rounded-xl border px-2.5 py-1.5 ${darkMode ? 'bg-slate-950 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>
+                    <Search className="w-3.5 h-3.5 text-slate-400 mr-1.5" />
+                    <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar..." autoFocus className="bg-transparent outline-none text-xs w-28 sm:w-40" />
+                    <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} className="text-slate-400 hover:text-white ml-1"><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                ) : (
+                  <button onClick={() => setSearchOpen(true)} className="p-2.5 rounded-xl border border-slate-800 bg-slate-800/50 text-slate-300 hover:text-white" title="Buscar"><Search className="w-4 h-4" /></button>
+                )}
+                <button onClick={() => startCall('voice', true)} className="p-2.5 rounded-xl border border-slate-800 bg-slate-800/50 text-slate-300 hover:text-emerald-400" title="Voz"><Phone className="w-4 h-4" /></button>
+                <button onClick={() => startCall('video', true)} className="p-2.5 rounded-xl border border-slate-800 bg-slate-800/50 text-slate-300 hover:text-blue-400" title="Video"><Video className="w-4 h-4" /></button>
+              </div>
+            </div>
+
+            {/* BARRA PINNED */}
+            {pinnedMessages.length > 0 && (
+              <div className="px-3 sm:px-6 py-2 border-b flex items-center justify-between gap-2 text-xs bg-amber-500/10 border-amber-500/30 text-amber-200 shrink-0">
+                <div className="flex items-center gap-2 truncate">
+                  <Pin className="w-3.5 h-3.5 text-amber-400 shrink-0 rotate-45" />
+                  <span className="font-bold">Fijado ({pinnedMessages[pinnedMessages.length - 1].sender}):</span>
+                  <span className="opacity-90 truncate">{(pinnedMessages[pinnedMessages.length - 1].text || '').replace(/^❝ [^\n]+\n/, '')}</span>
+                </div>
+                <button onClick={() => handleTogglePin(pinnedMessages[pinnedMessages.length - 1])} className="text-[10px] underline shrink-0">Desfijar</button>
+              </div>
+            )}
+
+            {/* MENSAJES */}
+            <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 bg-slate-950">
+              {displayedMessages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-50 text-xs">
+                  <Hash className="w-8 h-8 mb-2" />
+                  <p>No hay mensajes en este canal todavía.</p>
+                </div>
+              ) : (
+                displayedMessages.map((msg) => {
+                  const isAi = msg.type === 'ai' || msg.sender === '🤖 NEFA AI';
+                  const isMe = !isAi && msg.sender.toLowerCase() === userName.toLowerCase();
+                  const isPinned = msg.type === 'pinned';
+                  const parsed = parseMessageBody(msg.text);
+
+                  return (
+                    <div key={msg.id} className={`group flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                      {!isMe && (
+                        <span className={`text-[11px] font-bold mb-1 ml-1 flex items-center gap-1 ${isAi ? 'text-purple-400' : 'text-blue-400'}`}>
+                          {isAi && <Sparkles className="w-3 h-3" />}{msg.sender}
+                        </span>
+                      )}
+                      
+                      {msg.type === 'poke' ? (
+                        <div className="my-1.5 px-4 py-2 bg-amber-500/20 border-2 border-amber-500 text-amber-400 rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-lg">
+                          <BellRing className="w-4 h-4 animate-ping" />
+                          <span>¡{msg.sender} envió un Zumbido! ⚡ ({msg.time})</span>
+                        </div>
+                      ) : msg.type === 'call' ? (
+                        <div className="my-1.5 p-3.5 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 rounded-2xl text-xs flex items-center gap-3 shadow-lg">
+                          <div className="p-2 bg-emerald-500 text-slate-950 rounded-xl animate-pulse"><PhoneCall className="w-4 h-4" /></div>
+                          <div><p className="font-bold text-white">{msg.sender} {msg.text}</p></div>
+                          <button onClick={() => startCall('video', false)} className="px-3 py-1.5 bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs">Unirse</button>
+                        </div>
+                      ) : (
+                        <div className={`flex items-center gap-1.5 max-w-[90%] sm:max-w-md ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                          <div className={`rounded-2xl px-3.5 py-2.5 shadow-sm relative ${isPinned ? 'ring-2 ring-amber-400' : ''} ${
+                            isAi ? 'bg-gradient-to-br from-purple-950/90 to-slate-900 border border-purple-500/40 text-purple-100 rounded-bl-none' :
+                            isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-none'
+                          }`}>
+                            {parsed.quoteHeader && (
+                              <div className="text-[11px] mb-1.5 px-2.5 py-1 rounded-lg border-l-2 bg-slate-800/80 border-blue-400 text-slate-300">{parsed.quoteHeader}</div>
+                            )}
+                            {parsed.isTask ? (
+                              <div onClick={() => handleToggleTask(msg)} className="flex items-start gap-2 cursor-pointer select-none py-0.5">
+                                {parsed.isTaskChecked ? <CheckSquare className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5" /> : <Square className="w-4 h-4 opacity-80 shrink-0 mt-0.5" />}
+                                <span className={`text-xs sm:text-sm leading-relaxed break-words ${parsed.isTaskChecked ? 'line-through opacity-75' : 'font-medium'}`}>{renderFormattedText(parsed.cleanTaskText)}</span>
+                              </div>
+                            ) : (
+                              <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words">{renderFormattedText(parsed.mainText)}</p>
+                            )}
+                            <div className="flex items-center justify-end gap-1 mt-1 text-[10px] opacity-60">
+                              {isPinned && <Pin className="w-3 h-3 text-amber-300 mr-0.5" />}
+                              <span>{msg.time}</span>{isMe && <CheckCheck className="w-3.5 h-3.5" />}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            <button onClick={() => handleStartReply(msg)} className="p-1.5 rounded-lg border bg-slate-900 border-slate-800 text-slate-400 hover:text-white" title="Responder"><Reply className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleTogglePin(msg)} className="p-1.5 rounded-lg border bg-slate-900 border-slate-800 text-slate-400 hover:text-amber-400" title="Fijar"><Pin className="w-3.5 h-3.5" /></button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {(typingUsers.length > 0 || isAiThinking) && (
+              <div className="px-4 py-1 text-[11px] italic flex items-center gap-2 bg-slate-950 shrink-0">
+                {isAiThinking && <span className="text-purple-400 font-semibold animate-pulse">🤖 NEFA AI está pensando...</span>}
+                {typingUsers.length > 0 && <span className="text-blue-400">💬 {typingUsers.join(', ')} escribiendo...</span>}
+              </div>
+            )}
+
+            {replyingTo && (
+              <div className="px-4 py-2 border-t flex items-center justify-between text-xs bg-slate-900 border-slate-800 text-slate-300 shrink-0">
+                <div className="flex items-center gap-2 truncate">
+                  <Reply className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="font-bold text-blue-400">Respondiendo a {replyingTo.sender}:</span>
+                  <span className="truncate opacity-80">{(replyingTo.text || '').replace(/^❝ [^\n]+\n/, '')}</span>
+                </div>
+                <button onClick={() => setReplyingTo(null)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
+              </div>
+            )}
+
+            {/* BARRA DE ENTRADA */}
+            <div className="p-2.5 sm:p-4 border-t bg-slate-900 border-slate-800 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <label className="p-2.5 sm:p-3 rounded-xl border border-slate-800 bg-slate-800 text-slate-300 cursor-pointer shrink-0">
+                  <Paperclip className="w-4 h-4" /><input type="file" onChange={handleFileUpload} className="hidden" />
+                </label>
+                <button onClick={insertTaskTemplate} className="p-2.5 sm:p-3 rounded-xl border border-slate-800 bg-slate-800 text-emerald-400 shrink-0" title="Tarea"><CheckSquare className="w-4 h-4" /></button>
+                <button onClick={insertAiPrompt} className="p-2.5 sm:p-3 rounded-xl border border-slate-800 bg-slate-800 text-purple-400 shrink-0" title="Consultar a @nefa"><Bot className="w-4 h-4" /></button>
+                <button onClick={triggerPoke} className="p-2.5 sm:p-3 bg-amber-500 text-slate-950 rounded-xl font-bold shrink-0" title="Zumbido"><BellRing className="w-4 h-4" /></button>
+                
+                <div className="flex-1 flex items-center rounded-xl border px-3 py-2.5 bg-slate-950 border-slate-800 text-slate-100">
+                  <input 
+                    ref={inputRef} type="text" placeholder="Escribe un mensaje o @nefa consulta..."
+                    value={inputText} onChange={(e) => handleInputTyping(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage('text')}
+                    className="w-full bg-transparent border-none outline-none text-xs sm:text-sm"
+                  />
+                </div>
+                <button onClick={() => handleSendMessage('text')} className="p-2.5 sm:p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow shrink-0"><Send className="w-4 h-4" /></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL LLAMADA */}
       {isInCall && (
         <div className="fixed inset-0 bg-slate-950 z-50 flex flex-col">
           <div className="h-14 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-              <span className="font-bold text-xs sm:text-sm text-white">
-                Sala en vivo: #{activeChannel?.name || 'general'} ({callType === 'video' ? 'Videollamada' : 'Voz'})
-              </span>
-            </div>
-            <button 
-              onClick={() => setIsInCall(false)}
-              className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl shadow transition-transform active:scale-95"
-            >
-              Salir de la Sala
-            </button>
+            <span className="font-bold text-xs sm:text-sm text-white">Sala de llamadas en vivo</span>
+            <button onClick={() => setIsInCall(false)} className="px-4 py-1.5 bg-red-600 text-white text-xs font-bold rounded-xl">Salir</button>
           </div>
-          <div className="flex-1 w-full bg-black relative">
-            <iframe
-              src={jitsiUrl}
-              allow="camera; microphone; fullscreen; display-capture; autoplay"
-              className="w-full h-full border-0"
-              title="NEFA Live Call"
-            />
-          </div>
+          <div className="flex-1 w-full bg-black"><iframe src={jitsiUrl} allow="camera; microphone; fullscreen; display-capture; autoplay" className="w-full h-full border-0" title="Call" /></div>
         </div>
       )}
     </div>
