@@ -48,7 +48,7 @@ status: string;
 }async function sbFetch(path: string, method: string = 'GET', body?: unknown, extraHeaders?: Record<string, string>) {
 const headers: Record<string, string> = {
 apikey: SUPABASE_KEY,
-Authorization: Bearer ${SUPABASE_KEY},
+'Authorization': Bearer ${SUPABASE_KEY},
 'Content-Type': 'application/json',
 'Prefer': 'return=representation',
 ...(extraHeaders || {}),
