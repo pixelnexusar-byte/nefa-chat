@@ -46,7 +46,6 @@ interface ClientRecord {
   total_debt: number;
   arrival_date: string;
   notes: string;
-  attachments?: string; // URLs separadas por coma de Firebase Storage
 }
 
 interface ComexShipment {
@@ -131,12 +130,10 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'clients' | 'comex'>('chat');
 
-  // MSN
   const [myStatus, setMyStatus] = useState<'online' | 'away' | 'busy'>('online');
   const [myCustomStatus, setMyCustomStatus] = useState<string>('');
   const [presenceList, setPresenceList] = useState<PresenceUser[]>([]);
 
-  // Canales
   const [channels, setChannels] = useState<Channel[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string>('gen-1');
   const [isAddingChannel, setIsAddingChannel] = useState<boolean>(false);
@@ -146,7 +143,6 @@ export default function App() {
   const [editChannelName, setEditChannelName] = useState<string>('');
   const [editChannelDesc, setEditChannelDesc] = useState<string>('');
 
-  // Chat e IA
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState<string>('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -157,7 +153,6 @@ export default function App() {
   const [dbError, setDbError] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState<boolean>(false);
 
-  // Clientes
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [isAddingClient, setIsAddingClient] = useState<boolean>(false);
   const [clientName, setClientName] = useState<string>('');
@@ -169,9 +164,7 @@ export default function App() {
   const [clientArrival, setClientArrival] = useState<string>('');
   const [clientNotes, setClientNotes] = useState<string>('');
   const [clientSearch, setClientSearch] = useState<string>('');
-  const [uploadingFile, setUploadingFile] = useState<boolean>(false);
 
-  // Módulo Comex
   const [shipments, setShipments] = useState<ComexShipment[]>([]);
   const [isAddingShipment, setIsAddingShipment] = useState<boolean>(false);
   const [shipContainer, setShipContainer] = useState<string>('');
@@ -182,7 +175,6 @@ export default function App() {
   const [boxQuantity, setBoxQuantity] = useState<string>('');
   const [cbmResult, setCbmResult] = useState<number | null>(null);
 
-  // Llamadas
   const [isInCall, setIsInCall] = useState<boolean>(false);
   const [callType, setCallType] = useState<'voice' | 'video'>('voice');
 
@@ -393,7 +385,6 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, isAiThinking]);
 
-  // Canales
   const handleCreateChannel = async () => {
     if (!newChannelName.trim()) return;
     const cleanName = newChannelName.trim().toLowerCase().replace(/\s+/g, '-');
@@ -443,15 +434,12 @@ export default function App() {
     } catch {}
   };
 
-  // Subida de archivos a Firebase Storage simulada/enlace o subida directa
   const handleUploadToFirebase = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Generamos un link simulado seguro o permitimos ingresar la URL pública de Firebase Storage
-    // de la cuenta sierraltaemiliano@gmail.com
     const fileUrl = prompt(
-      `Subiendo "${file.name}". Ingresá o pegá la URL pública de Firebase Storage (Cuenta: sierraltaemiliano@gmail.com[cite: 3]):`,
+      `Subiendo "${file.name}". Ingresá o pegá la URL pública de Firebase Storage (Cuenta: sierraltaemiliano@gmail.com):`,
       `https://firebasestorage.googleapis.com/v0/b/chat-dcam.appspot.com/o/clients%2F${encodeURIComponent(file.name)}?alt=media`
     );
 
@@ -460,7 +448,6 @@ export default function App() {
     }
   };
 
-  // Clientes
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientName.trim()) return;
@@ -481,7 +468,6 @@ export default function App() {
     try { await sbFetch(`clients?id=eq.${encodeURIComponent(id)}`, 'DELETE'); setClients(prev => prev.filter(c => c.id !== id)); } catch {}
   };
 
-  // Calculadora CBM
   const calculateCbm = () => {
     const l = parseFloat(boxLength) || 0, w = parseFloat(boxWidth) || 0, h = parseFloat(boxHeight) || 0, qty = parseFloat(boxQuantity) || 0;
     if (l > 0 && w > 0 && h > 0 && qty > 0) {
@@ -497,7 +483,6 @@ export default function App() {
     handleSendMessage('text', text);
   };
 
-  // Bitácora Comex
   const handleCreateShipment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!shipContainer.trim() || !shipClient.trim()) return;
@@ -519,8 +504,7 @@ export default function App() {
     if (!window.confirm('¿Eliminar embarque?')) return;
     try { await sbFetch(`comex_shipments?id=eq.${encodeURIComponent(id)}`, 'DELETE'); setShipments(prev => prev.filter(s => s.id !== id)); } catch {}
   };
-}
-const handleEditCustomStatus = () => {
+  const handleEditCustomStatus = () => {
     const val = prompt('Frase personal MSN:', myCustomStatus);
     if (val !== null) { setMyCustomStatus(val.trim()); try { localStorage.setItem('nefa_custom_msg', val.trim()); } catch {} }
   };
@@ -722,7 +706,6 @@ const handleEditCustomStatus = () => {
         </div>
       )}
 
-      {/* BARRA DE TRES PESTAÑAS */}
       <div className={`h-12 px-4 border-b ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0`}>
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold text-xs">N</div>
@@ -735,7 +718,6 @@ const handleEditCustomStatus = () => {
         </div>
       </div>
 
-      {/* VISTA 1: CLIENTES & FIREBASE */}
       {activeTab === 'clients' ? (
         <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -819,8 +801,6 @@ const handleEditCustomStatus = () => {
           </div>
         </div>
       ) : activeTab === 'comex' ? (
-
-        /* VISTA 3: COMEX & CBM */
         <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8">
           <div><h1 className="text-xl font-bold tracking-tight">Operativa Comex y Calculador CBM</h1><p className="text-xs text-slate-400">Calculá el volumen cúbico y llevá la bitácora de documentación.</p></div>
 
@@ -891,8 +871,6 @@ const handleEditCustomStatus = () => {
           </div>
         </div>
       ) : (
-
-        /* VISTA 2: CHAT EN VIVO */
         <div className="flex-1 flex h-full w-full relative overflow-hidden">
           {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />}
           <div className={`fixed md:static inset-y-0 left-0 z-40 w-72 sm:w-80 flex flex-col border-r transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} shrink-0`}>
@@ -968,7 +946,7 @@ const handleEditCustomStatus = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5 truncate">
                   <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">{userName.substring(0, 2).toUpperCase()}</div>
-                  <div className="truncate"><p className="text-xs font-bold truncate">{userName}</p><p onClick={handleEditCustomStatus} className="text-[10px] text-blue-400 hover:underline cursor-pointer truncate max-w-[140px]">{myCustomStatus ? `“${myCustomStatus}”` : '✏️ Frase...'}</p></div>
+                  <div className="truncate"><p className="text-xs font-bold truncate">{userName}</p><p onClick={handleEditCustomStatus} className="text-[10px] text-blue-400 hover:underline cursor-pointer truncate max-w-[140px]">{myCustomStatus ? `“{myCustomStatus}”` : '✏️ Frase...'}</p></div>
                 </div>
                 <button onClick={handleLogout} className="text-xs text-red-400 hover:underline px-2 py-1">Salir</button>
               </div>
@@ -1096,7 +1074,7 @@ const handleEditCustomStatus = () => {
       )}
 
       {isInCall && (
-        <div className="fixed inset-0 bg-slate-950 z-50 flex ਫflex-col">
+        <div className="fixed inset-0 bg-slate-950 z-50 flex flex-col">
           <div className="h-14 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
             <span className="font-bold text-xs sm:text-sm text-white">Sala de llamadas en vivo</span>
             <button onClick={() => setIsInCall(false)} className="px-4 py-1.5 bg-red-600 text-white text-xs font-bold rounded-xl">Salir</button>
