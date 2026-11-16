@@ -212,7 +212,6 @@
     <button onclick="document.getElementById('err-bar').className='error-banner hidden'" style="background:transparent;border:0;color:#fff;text-decoration:underline;cursor:pointer">Cerrar</button>
   </div>
 
-  <!-- PANTALLA LOGIN -->
   <div id="login-view" class="login-screen">
     <div class="login-card">
       <div class="logo-box">⚡</div>
@@ -226,7 +225,6 @@
     </div>
   </div>
 
-  <!-- PANTALLA PRINCIPAL -->
   <div id="app-view" class="app-wrap hidden">
     <div id="sb-backdrop" class="backdrop hidden"></div>
 
@@ -240,8 +238,8 @@
           </div>
         </div>
         <div>
-          <button id="sound-btn" class="icon-btn" type="button" title="Activar/Silenciar sonidos MSN">🔊</button>
-          <button id="theme-btn" class="icon-btn" type="button" title="Cambiar tema">☀️</button>
+          <button id="sound-btn" class="icon-btn" type="button" title="Sonido">🔊</button>
+          <button id="theme-btn" class="icon-btn" type="button" title="Tema">☀️</button>
           <button id="close-sb-btn" class="icon-btn mobile-only" type="button">✕</button>
         </div>
       </div>
@@ -254,7 +252,7 @@
 
         <div id="add-ch-box" class="new-ch-box hidden">
           <input id="new-ch-name" type="text" placeholder="Nombre (ej. ventas)">
-          <input id="new-ch-desc" type="text" placeholder="Descripción corta">
+          <input id="new-ch-desc" type="text" placeholder="Descripción">
           <div class="new-ch-actions">
             <button id="cancel-add-ch" type="button" style="background:transparent;color:#94a3b8">Cancelar</button>
             <button id="save-add-ch" type="button" style="background:#2563eb;color:#fff">Crear</button>
@@ -263,7 +261,6 @@
 
         <div id="ch-list" class="ch-list"></div>
 
-        <!-- LISTA DE EQUIPO EN VIVO (TOCANDO MENCIONÁS CON @) -->
         <div class="sb-section" style="margin-top:8px">
           <span>EQUIPO EN LÍNEA</span>
           <span id="online-count" style="color:#10b981">1 activo</span>
@@ -271,14 +268,13 @@
         <div id="presence-list" class="presence-list"></div>
       </div>
 
-      <!-- FOOTER PERFIL CON ESTADO Y SUBTÍTULO MSN -->
       <div class="sb-footer">
         <div class="sb-footer-top">
           <div class="user-box">
             <div id="u-avatar" class="avatar">FS</div>
             <div style="overflow:hidden">
               <div id="u-name" class="u-name">Franco</div>
-              <div id="u-custom-display" class="u-custom-msg" title="Tocá para cambiar tu frase personal">✏️ Escribir frase personal...</div>
+              <div id="u-custom-display" class="u-custom-msg" title="Frase personal">✏️ Escribir frase...</div>
             </div>
           </div>
           <button id="logout-btn" class="btn-logout" type="button">Cambiar</button>
@@ -286,10 +282,10 @@
         <div class="msn-controls">
           <select id="status-select" class="status-select">
             <option value="online">🟢 Conectado</option>
-            <option value="away">🟠 Ausente (Vuelvo enseguida)</option>
-            <option value="busy">🔴 Ocupado (No molestar)</option>
+            <option value="away">🟠 Ausente</option>
+            <option value="busy">🔴 Ocupado</option>
           </select>
-          <button id="edit-custom-btn" class="btn-status-msg" type="button" title="Cambiar frase MSN">💬 Frase</button>
+          <button id="edit-custom-btn" class="btn-status-msg" type="button">💬 Frase</button>
         </div>
       </div>
     </aside>
@@ -300,21 +296,20 @@
           <button id="open-sb-btn" class="icon-btn mobile-only" type="button" style="margin-right:10px">☰</button>
           <div style="overflow:hidden">
             <div id="active-ch-name" class="top-title"># general</div>
-            <div id="active-ch-desc" class="top-desc">Coordinación general del equipo</div>
+            <div id="active-ch-desc" class="top-desc">Canal en vivo</div>
           </div>
         </div>
         <div class="top-actions">
           <div id="search-box" class="search-box hidden">
-            <input id="search-input" type="text" placeholder="Buscar en canal...">
+            <input id="search-input" type="text" placeholder="Buscar...">
             <button id="search-clear" class="search-close" type="button">✕</button>
           </div>
-          <button id="btn-search" class="icon-btn" type="button" title="Buscar mensajes">🔍</button>
-          <button id="btn-voice" class="icon-btn" type="button" title="Llamada de voz">📞</button>
-          <button id="btn-video" class="icon-btn" type="button" title="Videollamada">📹</button>
+          <button id="btn-search" class="icon-btn" type="button" title="Buscar">🔍</button>
+          <button id="btn-voice" class="icon-btn" type="button" title="Voz">📞</button>
+          <button id="btn-video" class="icon-btn" type="button" title="Video">📹</button>
         </div>
       </header>
 
-      <!-- BARRA SUPERIOR DE MENSAJE FIJADO (PINNED) -->
       <div id="pin-bar" class="pin-bar hidden">
         <div id="pin-text" class="pin-text"></div>
         <button id="btn-unpin" class="btn-unpin" type="button">Desfijar</button>
@@ -322,35 +317,32 @@
 
       <div id="msg-area" class="msg-area"></div>
 
-      <!-- BARRA INDICADORA DE "ESCRIBIENDO..." -->
       <div id="typing-bar" class="typing-bar"></div>
 
-      <!-- BARRA DE PREVISUALIZACIÓN DE RESPUESTA CITADA -->
       <div id="reply-bar" class="reply-bar hidden">
         <div id="reply-text" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:10px"></div>
         <button id="reply-cancel" type="button" style="background:transparent;border:0;color:#94a3b8;cursor:pointer;font-weight:bold">✕</button>
       </div>
 
       <div class="input-bar">
-        <label class="icon-btn btn-clip" title="Adjuntar archivo">
+        <label class="icon-btn btn-clip" title="Adjuntar">
           📎
           <input id="file-input" type="file" style="display:none">
         </label>
-        <button id="btn-task" class="btn-task" type="button" title="Crear tarea / checklist interactivo">☑️</button>
-        <button id="btn-buzz" class="btn-buzz" type="button" title="Enviar Zumbido MSN">🔔</button>
-        <input id="msg-input" class="text-input" type="text" placeholder="Mensaje o @mención..." autocomplete="off">
+        <button id="btn-task" class="btn-task" type="button" title="Tarea">☑️</button>
+        <button id="btn-buzz" class="btn-buzz" type="button" title="Zumbido">🔔</button>
+        <input id="msg-input" class="text-input" type="text" placeholder="Mensaje..." autocomplete="off">
         <button id="btn-send" class="btn-send" type="button">Enviar</button>
       </div>
     </main>
   </div>
 
-  <!-- SALA DE LLAMADA JITSI -->
   <div id="call-modal" class="call-modal hidden">
     <div class="call-top">
       <span id="call-title">● Sala en vivo</span>
       <div>
-        <a id="call-ext" href="#" target="_blank" style="color:#60a5fa;margin-right:14px;font-size:12px">Abrir en ventana</a>
-        <button id="btn-hangup" class="btn-hangup" type="button">Salir de la Sala</button>
+        <a id="call-ext" href="#" target="_blank" style="color:#60a5fa;margin-right:14px;font-size:12px">Ventana</a>
+        <button id="btn-hangup" class="btn-hangup" type="button">Salir</button>
       </div>
     </div>
     <div id="call-frame" class="call-frame"></div>
@@ -472,7 +464,7 @@
           typing_at: new Date().toISOString(),
           last_seen: new Date().toISOString()
         };
-        api('POST', 'presence', [payload], { 'Prefer': 'resolution=merge-duplicates' }, function () {
+        api('POST', 'presence?on_conflict=username', [payload], { 'Prefer': 'resolution=merge-duplicates,return=minimal' }, function () {
           api('GET', 'presence?select=*&order=username.asc', null, null, function (err, list) {
             if (!err && list) {
               state.presence = list;
@@ -489,16 +481,27 @@
         var activeCount = 0;
         var typingUsers = [];
 
-        for (var i = 0; i < state.presence.length; i++) {
+        var rosterMap = {};
+        for (var p = 0; p < state.presence.length; p++) {
+          if (state.presence[p].username) rosterMap[state.presence[p].username.toLowerCase()] = state.presence[p];
+        }
+        rosterMap[state.user.toLowerCase()] = { username: state.user, status: state.myStatus, custom_status: state.myCustom, last_seen: new Date().toISOString() };
+        
+        for (var m = 0; m < state.messages.length; m++) {
+          var snd = state.messages[m].sender;
+          if (snd && snd !== '🤖 NEFA AI' && !rosterMap[snd.toLowerCase()]) {
+            rosterMap[snd.toLowerCase()] = { username: snd, status: 'online', custom_status: '', last_seen: new Date().toISOString() };
+          }
+        }
+
+        var roster = [];
+        for (var k in rosterMap) { if (rosterMap.hasOwnProperty(k)) roster.push(rosterMap[k]); }
+
+        for (var i = 0; i < roster.length; i++) {
           (function (p) {
             var seenDiff = now - new Date(p.last_seen).getTime();
-            var isOnline = seenDiff < 40000;
+            var isOnline = seenDiff < 90000;
             if (isOnline) activeCount++;
-
-            var typeDiff = now - new Date(p.typing_at).getTime();
-            if (isOnline && p.typing_in === state.chatId && typeDiff < 6000 && p.username.toLowerCase() !== state.user.toLowerCase()) {
-              typingUsers.push(p.username);
-            }
 
             var row = document.createElement('div');
             row.className = 'user-presence-item';
@@ -531,11 +534,10 @@
             }
             row.appendChild(info);
             box.appendChild(row);
-          })(state.presence[i]);
+          })(roster[i]);
         }
 
         el('online-count').textContent = (activeCount || 1) + ((activeCount || 1) === 1 ? ' activo' : ' activos');
-        el('typing-bar').textContent = typingUsers.length > 0 ? ('💬 ' + typingUsers.join(', ') + ' está escribiendo...') : '';
       }
 
       function toggleSidebar(open) {
@@ -582,7 +584,9 @@
               db.onclick = function (e) {
                 e.stopPropagation();
                 if (!confirm('¿Eliminar #' + ch.name + '?')) return;
-                api('DELETE', 'channels?id=eq.' + encodeURIComponent(ch.id), null, null, function () { loadChannels(true); });
+                api('DELETE', 'messages?channel_id=eq.' + encodeURIComponent(ch.id), null, null, function () {
+                  api('DELETE', 'channels?id=eq.' + encodeURIComponent(ch.id), null, null, function () { loadChannels(true); });
+                });
               };
               btns.appendChild(db);
             }
@@ -604,7 +608,7 @@
       }
 
       function loadChannels(reloadMsgs) {
-        api('GET', 'channels?select=*&order=created_at.asc', null, null, function (err, data) {
+        api('GET', 'channels?select=*', null, null, function (err, data) {
           if (!err && data && data.length > 0) {
             state.channels = data;
             if (!getActiveCh()) state.chatId = data[0].id;
@@ -614,7 +618,6 @@
         });
       }
 
-      // --- FUNCIONES OPCIÓN 3: PIN, CHECKLISTS, CITAS Y MENCIONES ---
       function togglePinMessage(m) {
         var newType = (m.type === 'pinned') ? 'text' : 'pinned';
         api('PATCH', 'messages?id=eq.' + encodeURIComponent(m.id), { type: newType }, null, function (err) {
@@ -700,7 +703,6 @@
         var nearBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) < 90;
         area.innerHTML = '';
 
-        // Actualizar barra de mensaje fijado arriba del canal
         var pinnedList = [];
         for (var p = 0; p < list.length; p++) {
           if (list[p].type === 'pinned') pinnedList.push(list[p]);
@@ -725,18 +727,19 @@
               if (!matchTxt && !matchSnd) return;
             }
 
-            var me = m.sender && m.sender.toLowerCase() === state.user.toLowerCase();
+            var isAi = m.type === 'ai' || m.sender === '🤖 NEFA AI';
+            var me = !isAi && m.sender && m.sender.toLowerCase() === state.user.toLowerCase();
             if (m.type === 'poke') {
               var ce = document.createElement('div'); ce.className = 'center-event';
               var pb = document.createElement('div'); pb.className = 'poke-badge';
-              pb.textContent = '🔔 ¡' + m.sender + ' ha enviado un Zumbido! ⚡ (' + (m.time || '') + ')';
+              pb.textContent = '🔔 ¡' + m.sender + ' envió un Zumbido! ⚡ (' + (m.time || '') + ')';
               ce.appendChild(pb); area.appendChild(ce);
             } else if (m.type === 'call') {
               var cc = document.createElement('div'); cc.className = 'center-event';
               var cb = document.createElement('div'); cb.className = 'call-badge';
               var st = document.createElement('div'); st.style.fontWeight = 'bold';
-              st.textContent = m.sender + ' ' + (m.text || 'inició una llamada') + ' (' + (m.time || '') + ')';
-              var jb = document.createElement('button'); jb.className = 'btn-join'; jb.textContent = 'Unirse ahora';
+              st.textContent = m.sender + ' ' + (m.text || 'inició llamada');
+              var jb = document.createElement('button'); jb.className = 'btn-join'; jb.textContent = 'Unirse';
               jb.onclick = function () { startCall('video', false); };
               cb.appendChild(st); cb.appendChild(jb); cc.appendChild(cb); area.appendChild(cc);
             } else {
@@ -752,7 +755,6 @@
               var bb = document.createElement('div');
               bb.className = 'msg-bubble' + (m.type === 'pinned' ? ' pinned-ring' : '');
 
-              // Separar cita si existe
               var rawTxt = m.text || '';
               var quoteHdr = null;
               var mainTxt = rawTxt;
@@ -799,31 +801,20 @@
                 bb.appendChild(tm);
               }
 
-              // Botones de Responder y Fijar
               var acts = document.createElement('div');
               acts.className = 'msg-actions';
 
               var repBtn = document.createElement('button');
-              repBtn.type = 'button';
-              repBtn.className = 'act-btn';
-              repBtn.title = 'Responder';
-              repBtn.textContent = '↩️';
+              repBtn.type = 'button'; repBtn.className = 'act-btn'; repBtn.textContent = '↩️';
               repBtn.onclick = function () { startReply(m); };
 
               var pinBtn = document.createElement('button');
-              pinBtn.type = 'button';
-              pinBtn.className = 'act-btn' + (m.type === 'pinned' ? ' active-pin' : '');
-              pinBtn.title = m.type === 'pinned' ? 'Desfijar' : 'Fijar arriba';
-              pinBtn.textContent = '📌';
+              pinBtn.type = 'button'; pinBtn.className = 'act-btn' + (m.type === 'pinned' ? ' active-pin' : ''); pinBtn.textContent = '📌';
               pinBtn.onclick = function () { togglePinMessage(m); };
 
-              acts.appendChild(repBtn);
-              acts.appendChild(pinBtn);
-
-              flexWrap.appendChild(bb);
-              flexWrap.appendChild(acts);
-              row.appendChild(flexWrap);
-              area.appendChild(row);
+              acts.appendChild(repBtn); acts.appendChild(pinBtn);
+              flexWrap.appendChild(bb); flexWrap.appendChild(acts);
+              row.appendChild(flexWrap); area.appendChild(row);
             }
           })(list[i]);
         }
@@ -849,8 +840,6 @@
           if (!err) {
             loadMessages(false);
             syncPresence('');
-          } else {
-            setErr('No se pudo enviar: ' + err);
           }
         });
       }
@@ -860,18 +849,17 @@
         var url = 'https://meet.jit.si/' + room + '#userInfo.displayName="' + encodeURIComponent(state.user) + '"&config.prejoinPageEnabled=false&config.startWithVideoMuted=' + (mode === 'voice');
         var ch = getActiveCh();
         el('call-title').textContent = '● Sala en vivo: #' + (ch ? ch.name : 'general');
-        el('call-ext').href = url;
         el('call-frame').innerHTML = '<iframe src="' + url + '" allow="camera; microphone; fullscreen; display-capture; autoplay"></iframe>';
         show('call-modal', true);
         if (announce) sendMsg('📞 Inició una ' + (mode === 'video' ? 'Videollamada' : 'Llamada de voz') + ' en vivo', 'call');
       }
 
       function promptCustomMessage() {
-        var val = prompt('Escribí tu frase personal estilo MSN (ej. Cotizando flete / En reunión):', state.myCustom || '');
+        var val = prompt('Frase personal MSN:', state.myCustom || '');
         if (val !== null) {
           state.myCustom = val.replace(/^\s+|\s+$/g, '');
           try { localStorage.setItem('nefa_custom_msg', state.myCustom); } catch (e) {}
-          el('u-custom-display').textContent = state.myCustom ? ('“' + state.myCustom + '”') : '✏️ Escribir frase personal...';
+          el('u-custom-display').textContent = state.myCustom ? ('“' + state.myCustom + '”') : '✏️ Frase personal...';
           syncPresence();
         }
       }
@@ -888,7 +876,7 @@
         el('sb-online-user').textContent = '● En vivo (' + name + ')';
         el('u-avatar').textContent = name.substring(0, 2).toUpperCase();
         el('status-select').value = state.myStatus;
-        el('u-custom-display').textContent = state.myCustom ? ('“' + state.myCustom + '”') : '✏️ Escribir frase personal...';
+        el('u-custom-display').textContent = state.myCustom ? ('“' + state.myCustom + '”') : '✏️ Frase personal...';
 
         show('login-view', false); show('app-view', true);
         loadChannels(true);
@@ -896,9 +884,6 @@
 
         if (state.timer) clearInterval(state.timer);
         state.timer = setInterval(function () {
-          if (state.isTyping && (new Date().getTime() - state.lastTypedAt > 4000)) {
-            state.isTyping = false;
-          }
           loadMessages(false);
           loadChannels(false);
           syncPresence();
@@ -937,31 +922,14 @@
       el('close-sb-btn').onclick = function () { toggleSidebar(false); };
       el('sb-backdrop').onclick = function () { toggleSidebar(false); };
 
-      // Eventos Buscador, Pin Bar, Reply y Checklist
       el('btn-search').onclick = function () {
         var isHidden = el('search-box').className.indexOf('hidden') !== -1;
         show('search-box', isHidden);
-        if (isHidden) {
-          el('search-input').focus();
-        } else {
-          state.searchQuery = '';
-          el('search-input').value = '';
-          renderMessages();
-        }
+        if (isHidden) { el('search-input').focus(); } else { state.searchQuery = ''; el('search-input').value = ''; renderMessages(); }
       };
-      el('search-input').onkeyup = function () {
-        state.searchQuery = el('search-input').value;
-        renderMessages();
-      };
-      el('search-clear').onclick = function () {
-        state.searchQuery = '';
-        el('search-input').value = '';
-        show('search-box', false);
-        renderMessages();
-      };
-      el('btn-unpin').onclick = function () {
-        if (state.lastPinnedMsg) togglePinMessage(state.lastPinnedMsg);
-      };
+      el('search-input').onkeyup = function () { state.searchQuery = el('search-input').value; renderMessages(); };
+      el('search-clear').onclick = function () { state.searchQuery = ''; el('search-input').value = ''; show('search-box', false); renderMessages(); };
+      el('btn-unpin').onclick = function () { if (state.lastPinnedMsg) togglePinMessage(state.lastPinnedMsg); };
       el('reply-cancel').onclick = clearReply;
       el('btn-task').onclick = function () {
         var inp = el('msg-input');
@@ -980,7 +948,7 @@
       el('save-add-ch').onclick = function () {
         var n = el('new-ch-name').value.replace(/^\s+|\s+$/g, '');
         if (!n) return;
-        var ch = { id: 'ch-' + new Date().getTime(), name: n.toLowerCase().replace(/\s+/g, '-'), description: el('new-ch-desc').value || 'Canal del equipo' };
+        var ch = { id: 'ch-' + new Date().getTime(), name: n.toLowerCase().replace(/\s+/g, '-'), description: el('new-ch-desc').value || 'Canal' };
         api('POST', 'channels', [ch], null, function (err) {
           if (!err) {
             el('new-ch-name').value = ''; el('new-ch-desc').value = '';
@@ -996,19 +964,12 @@
         if ((e.keyCode || e.which) === 13) {
           if (e.preventDefault) e.preventDefault();
           el('btn-send').click();
-        } else {
-          var now = new Date().getTime();
-          state.lastTypedAt = now;
-          if (!state.isTyping) {
-            state.isTyping = true;
-            syncPresence(state.chatId);
-          }
         }
       };
       el('btn-buzz').onclick = function () { buzzEffect(); sendMsg('⚡ ¡Acaba de enviar un Zumbido!', 'poke'); };
       el('file-input').onchange = function (e) {
         var f = e.target.files && e.target.files[0];
-        if (f) sendMsg('📁 Archivo adjunto: ' + f.name + ' (' + (f.size / 1024 / 1024).toFixed(1) + ' MB)', 'file');
+        if (f) sendMsg('📁 Archivo adjunto: ' + f.name, 'file');
       };
       el('btn-voice').onclick = function () { startCall('voice', true); };
       el('btn-video').onclick = function () { startCall('video', true); };
