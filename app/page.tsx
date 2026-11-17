@@ -91,7 +91,7 @@ async function askGroqQwen(apiKey: string, promptText: string, recentMessages: M
     `Eres NEFA AI (@nefa), asistente inteligente para el equipo de "De China al Mundo" / "NEFA Software". ` +
     `Ayudas con logística internacional China-Argentina, cálculo de CBM, costos, aduana y operaciones. Responde claro y conciso en español. Canal: #${channelName}. Usuario: ${senderName}.`;
 
-  const modelsToTry = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'];
+  const modelsToTry = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
   let lastError = 'No se pudo conectar con Groq';
 
   for (const modelName of modelsToTry) {
