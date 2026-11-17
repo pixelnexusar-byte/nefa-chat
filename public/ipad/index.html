@@ -3,982 +3,291 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>NEFA Software Chat</title>
+  <title>NEFA Software - iPad Workspace</title>
   <style>
     * { box-sizing: border-box; -webkit-box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; -webkit-text-size-adjust: 100%; }
-    
-    body.dark { background: #020617; color: #f1f5f9; }
-    body.light { background: #f8fafc; color: #0f172a; }
+    html, body { width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; -webkit-text-size-adjust: 100%; background: #020617; color: #f1f5f9; }
     
     button, input, select { font: inherit; outline: none; }
     .hidden { display: none !important; }
 
-    /* BANNER ERROR */
-    .error-banner { position: fixed; top: 0; left: 0; right: 0; background: #dc2626; color: #fff; padding: 10px 16px; font-size: 12px; font-weight: bold; z-index: 9999; display: -webkit-flex; display: flex; -webkit-justify-content: space-between; justify-content: space-between; -webkit-align-items: center; align-items: center; }
+    .error-banner { position: fixed; top: 0; left: 0; right: 0; background: #dc2626; color: #fff; padding: 8px 14px; font-size: 11px; font-weight: bold; z-index: 9999; display: flex; justify-content: space-between; align-items: center; }
 
-    /* LOGIN MODERNO */
-    .login-screen { width: 100%; height: 100%; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; padding: 16px; background: #020617; color: #f1f5f9; }
-    .login-card { width: 100%; max-width: 420px; background: #0f172a; border: 1px solid #1e293b; border-radius: 20px; padding: 32px 28px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); text-align: center; }
-    .logo-box { width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #2563eb, #06b6d4); display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; color: #fff; font-size: 26px; font-weight: bold; margin-bottom: 14px; box-shadow: 0 10px 20px rgba(37,99,235,0.3); }
-    .login-card h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
-    .login-card p { font-size: 12px; color: #94a3b8; margin-bottom: 24px; }
-    .login-card label { display: block; text-align: left; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px; }
-    .login-card input { width: 100%; background: #020617; border: 1px solid #1e293b; border-radius: 12px; padding: 13px 16px; color: #fff; font-size: 14px; margin-bottom: 18px; }
-    .login-card input:focus { border-color: #3b82f6; }
-    .btn-login { width: 100%; background: #2563eb; color: #fff; border: 0; border-radius: 12px; padding: 14px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 16px rgba(37,99,235,0.25); }
+    .login-screen { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 16px; background: #020617; }
+    .login-card { width: 100%; max-width: 380px; background: #0f172a; border: 1px solid #1e293b; border-radius: 20px; padding: 28px; box-shadow: 0 25px 50px rgba(0,0,0,0.6); text-align: center; }
+    .logo-box { width: 50px; height: 50px; border-radius: 14px; background: linear-gradient(135deg, #2563eb, #06b6d4); display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; font-weight: bold; margin-bottom: 12px; }
+    .login-card h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .login-card p { font-size: 11px; color: #94a3b8; margin-bottom: 20px; }
+    .login-card label { display: block; text-align: left; font-size: 11px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px; }
+    .login-card input { width: 100%; background: #020617; border: 1px solid #1e293b; border-radius: 10px; padding: 12px 14px; color: #fff; font-size: 13px; margin-bottom: 16px; }
+    .btn-login { width: 100%; background: #2563eb; color: #fff; border: 0; border-radius: 10px; padding: 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
 
-    /* LAYOUT PRINCIPAL */
-    .app-wrap { width: 100%; height: 100%; display: -webkit-flex; display: flex; position: relative; overflow: hidden; }
-    .backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 30; }
+    .app-wrap { width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+    .top-tabs { height: 48px; background: #0f172a; border-bottom: 1px solid #1e293b; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; flex-shrink: 0; }
+    .tab-btn { background: transparent; border: 0; color: #94a3b8; font-size: 11px; font-weight: 600; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+    .tab-btn.active { background: #2563eb; color: #fff; }
 
-    /* SIDEBAR */
-    .sidebar { width: 310px; height: 100%; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; border-right: 1px solid #1e293b; background: #0f172a; z-index: 40; -webkit-flex-shrink: 0; flex-shrink: 0; transition: transform 0.2s ease, -webkit-transform 0.2s ease; }
-    body.light .sidebar { background: #ffffff; border-right-color: #e2e8f0; }
-
-    .sb-header { padding: 14px 16px; border-bottom: 1px solid #1e293b; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; }
-    body.light .sb-header { border-bottom-color: #e2e8f0; }
-    .brand { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; }
-    .brand-icon { width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(135deg, #2563eb, #06b6d4); color: #fff; font-weight: bold; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; margin-right: 10px; }
-    .brand-title { font-size: 14px; font-weight: 700; }
-    .brand-sub { font-size: 10px; color: #10b981; margin-top: 2px; }
-
-    .icon-btn { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; width: 35px; height: 35px; border-radius: 10px; cursor: pointer; display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; font-size: 14px; }
-    body.light .icon-btn { background: #f1f5f9; border-color: #cbd5e1; color: #334155; }
-    .mobile-only { display: none; }
-
-    .sb-scroll { -webkit-flex: 1; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 10px; }
-
-    .sb-section { padding: 12px 14px 6px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; font-size: 10.5px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px; }
-    .btn-add-ch { background: #2563eb; color: #fff; border: 0; border-radius: 8px; padding: 4px 9px; font-size: 11px; font-weight: 600; cursor: pointer; }
-
-    .new-ch-box { margin: 0 12px 10px; padding: 12px; background: #020617; border: 1px solid #1e293b; border-radius: 12px; }
-    body.light .new-ch-box { background: #f8fafc; border-color: #cbd5e1; }
-    .new-ch-box input { width: 100%; background: transparent; border: 1px solid #334155; color: inherit; padding: 7px 10px; border-radius: 8px; font-size: 12px; margin-bottom: 8px; }
-    .new-ch-actions { text-align: right; }
-    .new-ch-actions button { padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; border: 0; margin-left: 6px; }
-
-    .ch-list { padding: 2px 12px; }
-    .ch-item { padding: 9px 11px; border-radius: 11px; margin-bottom: 3px; cursor: pointer; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; color: #cbd5e1; border: 1px solid transparent; }
-    body.light .ch-item { color: #334155; }
-    .ch-item:hover { background: rgba(148,163,184,0.1); }
-    .ch-item.active { background: rgba(37,99,235,0.18); color: #60a5fa; border-color: rgba(59,130,246,0.35); }
-    body.light .ch-item.active { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
-    .ch-info { overflow: hidden; padding-right: 8px; }
-    .ch-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ch-desc { font-size: 10px; opacity: 0.65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
-    .ch-btns button { background: transparent; border: 0; color: inherit; opacity: 0.6; cursor: pointer; padding: 3px 5px; font-size: 11px; border-radius: 6px; }
-    .ch-btns button:hover { opacity: 1; background: rgba(148,163,184,0.2); }
-
-    /* LISTA DE PRESENCIA MSN */
-    .presence-list { padding: 2px 12px; }
-    .user-presence-item { padding: 7px 10px; border-radius: 10px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-bottom: 3px; cursor: pointer; }
-    .user-presence-item:hover { background: rgba(148,163,184,0.12); }
-    .status-dot { width: 9px; height: 9px; border-radius: 50%; margin-right: 9px; -webkit-flex-shrink: 0; flex-shrink: 0; }
-    .dot-online { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.6); }
-    .dot-away { background: #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.5); }
-    .dot-busy { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.5); }
-    .dot-offline { background: #64748b; opacity: 0.5; }
-    .up-info { overflow: hidden; -webkit-flex: 1; flex: 1; }
-    .up-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .up-custom { font-size: 10px; color: #94a3b8; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    /* FOOTER PERFIL ESTILO MSN */
-    .sb-footer { padding: 12px 14px; border-top: 1px solid #1e293b; background: rgba(2,6,23,0.4); }
-    body.light .sb-footer { border-top-color: #e2e8f0; background: #f8fafc; }
-    .sb-footer-top { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; margin-bottom: 8px; }
-    .user-box { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; overflow: hidden; }
-    .avatar { width: 32px; height: 32px; border-radius: 50%; background: #2563eb; color: #fff; font-size: 12px; font-weight: bold; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; margin-right: 9px; -webkit-flex-shrink: 0; flex-shrink: 0; }
-    .u-name { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .u-custom-msg { font-size: 10px; color: #60a5fa; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
-    .btn-logout { background: transparent; border: 0; color: #f87171; font-size: 11px; cursor: pointer; text-decoration: underline; }
-    .msn-controls { display: -webkit-flex; display: flex; gap: 6px; }
-    .status-select { -webkit-flex: 1; flex: 1; background: #0f172a; border: 1px solid #334155; color: inherit; font-size: 11px; padding: 5px 8px; border-radius: 8px; cursor: pointer; }
-    body.light .status-select { background: #fff; border-color: #cbd5e1; }
-    .btn-status-msg { background: #1e293b; border: 1px solid #334155; color: inherit; font-size: 11px; padding: 5px 8px; border-radius: 8px; cursor: pointer; }
-    body.light .btn-status-msg { background: #fff; border-color: #cbd5e1; }
-
-    /* CHAT PRINCIPAL */
-    .chat-main { -webkit-flex: 1; flex: 1; height: 100%; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; overflow: hidden; }
-    .chat-top { height: 58px; padding: 0 16px; border-bottom: 1px solid #1e293b; background: #0f172a; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; -webkit-flex-shrink: 0; flex-shrink: 0; }
-    body.light .chat-top { background: #ffffff; border-bottom-color: #e2e8f0; }
-    .top-left { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; overflow: hidden; }
-    .top-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .top-desc { font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .top-actions { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; gap: 6px; -webkit-flex-shrink: 0; flex-shrink: 0; }
-
-    /* BUSCADOR RÁPIDO */
-    .search-box { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; background: #020617; border: 1px solid #334155; border-radius: 10px; padding: 4px 8px; margin-right: 4px; }
-    body.light .search-box { background: #f1f5f9; border-color: #cbd5e1; }
-    .search-box input { background: transparent; border: 0; color: inherit; font-size: 12px; width: 130px; }
-    .search-close { background: transparent; border: 0; color: #94a3b8; cursor: pointer; font-size: 12px; margin-left: 4px; }
-
-    /* BARRA DE MENSAJE FIJADO (PINNED) */
-    .pin-bar { padding: 8px 16px; background: rgba(245,158,11,0.12); border-bottom: 1px solid rgba(245,158,11,0.3); color: #fde68a; font-size: 12px; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; -webkit-flex-shrink: 0; flex-shrink: 0; }
-    body.light .pin-bar { background: #fffbeb; border-bottom-color: #fde68a; color: #92400e; }
-    .pin-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; }
-    .btn-unpin { background: transparent; border: 0; color: inherit; text-decoration: underline; font-size: 11px; cursor: pointer; -webkit-flex-shrink: 0; flex-shrink: 0; }
-
-    .msg-area { -webkit-flex: 1; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; }
-    .msg-row { display: block; clear: both; margin-bottom: 14px; max-width: 88%; float: left; }
-    .msg-row.me { float: right; text-align: right; }
-    .msg-sender { display: block; font-size: 11px; font-weight: 700; color: #60a5fa; margin-bottom: 3px; margin-left: 4px; }
+    .view-container { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
     
-    .msg-flex { display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; gap: 6px; }
-    .msg-row.me .msg-flex { -webkit-flex-direction: row-reverse; flex-direction: row-reverse; }
+    /* CHAT VIEW */
+    .chat-layout { flex: 1; display: flex; position: relative; overflow: hidden; }
+    .backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 30; }
+    .sidebar { width: 260px; height: 100%; display: flex; flex-direction: column; border-right: 1px solid #1e293b; background: #0f172a; z-index: 40; position: absolute; left: 0; top: 0; transform: translateX(-100%); transition: transform 0.2s ease; }
+    .sidebar.open { transform: translateX(0); }
+    .sb-header { padding: 12px; border-bottom: 1px solid #1e293b; display: flex; align-items: center; justify-content: space-between; }
+    .sb-scroll { flex: 1; overflow-y: auto; padding: 8px; }
+    .ch-item { padding: 8px 10px; border-radius: 8px; margin-bottom: 2px; cursor: pointer; font-size: 12px; font-weight: 600; color: #cbd5e1; }
+    .ch-item.active { background: rgba(37,99,235,0.2); color: #60a5fa; }
 
-    .msg-bubble { display: inline-block; padding: 10px 14px; border-radius: 16px; border-bottom-left-radius: 3px; background: #0f172a; border: 1px solid #1e293b; color: #f1f5f9; font-size: 13.5px; line-height: 1.45; text-align: left; word-wrap: break-word; }
-    body.light .msg-bubble { background: #ffffff; border-color: #e2e8f0; color: #0f172a; }
-    .msg-row.me .msg-bubble { background: #2563eb; border-color: #2563eb; color: #ffffff; border-bottom-left-radius: 16px; border-bottom-right-radius: 3px; }
-    .msg-bubble.pinned-ring { border: 2px solid #f59e0b !important; }
+    .chat-main { flex: 1; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+    .chat-top { height: 44px; padding: 0 12px; border-bottom: 1px solid #1e293b; background: #0f172a; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; font-size: 12px; font-weight: bold; }
+    .msg-area { flex: 1; overflow-y: auto; padding: 12px; }
+    .msg-row { margin-bottom: 10px; max-width: 85%; clear: both; float: left; }
+    .msg-row.me { float: right; text-align: right; }
+    .msg-bubble { display: inline-block; padding: 8px 12px; border-radius: 12px; background: #0f172a; border: 1px solid #1e293b; color: #f1f5f9; font-size: 12px; text-align: left; }
+    .msg-row.me .msg-bubble { background: #2563eb; border-color: #2563eb; color: #fff; }
+    .input-bar { padding: 8px 12px; border-top: 1px solid #1e293b; background: #0f172a; display: flex; align-items: center; flex-shrink: 0; }
+    .text-input { flex: 1; height: 34px; background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 0 10px; color: #fff; font-size: 12px; margin-right: 6px; }
+    .btn-send { background: #2563eb; color: #fff; border: 0; height: 34px; padding: 0 12px; border-radius: 8px; font-weight: 600; font-size: 11px; cursor: pointer; }
 
-    /* CITA DE RESPUESTA Y MENCIONES */
-    .quote-box { font-size: 11px; margin-bottom: 6px; padding: 5px 9px; border-radius: 8px; border-left: 3px solid #60a5fa; background: rgba(15,23,42,0.55); color: #cbd5e1; }
-    .msg-row.me .quote-box { background: rgba(29,78,216,0.65); border-left-color: #bfdbfe; color: #e0f2fe; }
-    .mention-tag { background: rgba(251,191,36,0.25); color: #fde047; border: 1px solid rgba(251,191,36,0.45); padding: 1px 5px; border-radius: 5px; font-weight: 700; }
-    body.light .mention-tag { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+    /* CLIENTES Y COMEX VIEWS */
+    .p-content { padding: 14px; }
+    .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+    .card h2 { font-size: 13px; font-weight: bold; color: #60a5fa; margin-bottom: 8px; }
+    .field-row { margin-bottom: 8px; }
+    .field-row label { display: block; font-size: 10px; color: #94a3b8; margin-bottom: 3px; }
+    .field-row input { width: 100%; background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 8px; color: #fff; font-size: 12px; }
+    .btn-action { background: #2563eb; color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; font-size: 11px; font-weight: bold; cursor: pointer; }
+    
+    .table-box { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
+    .table-box th, .table-box td { border: 1px solid #1e293b; padding: 6px; text-align: left; }
+    .table-box th { background: #1e293b; color: #94a3b8; }
 
-    /* TAREA / CHECKLIST INTERACTIVO */
-    .task-row { display: -webkit-flex; display: flex; -webkit-align-items: flex-start; align-items: flex-start; cursor: pointer; padding: 2px 0; }
-    .task-box { font-size: 15px; margin-right: 7px; line-height: 1.2; }
-    .task-done { text-decoration: line-through; opacity: 0.75; }
-
-    /* ACCIONES RÁPIDAS DEL MENSAJE (RESPONDER / FIJAR) */
-    .msg-actions { display: -webkit-inline-flex; display: inline-flex; gap: 4px; opacity: 0.75; }
-    .act-btn { background: #0f172a; border: 1px solid #334155; color: #94a3b8; width: 28px; height: 28px; border-radius: 8px; font-size: 12px; cursor: pointer; display: -webkit-inline-flex; display: inline-flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
-    body.light .act-btn { background: #fff; border-color: #cbd5e1; color: #475569; }
-    .act-btn.active-pin { background: rgba(245,158,11,0.2); border-color: #f59e0b; color: #fbbf24; }
-
-    .msg-time { display: block; font-size: 10px; opacity: 0.7; margin-top: 4px; text-align: right; }
-
-    .center-event { clear: both; width: 100%; text-align: center; margin: 12px 0; float: left; }
-    .poke-badge { display: inline-block; background: rgba(245,158,11,0.18); border: 2px solid #f59e0b; color: #fbbf24; padding: 8px 16px; border-radius: 14px; font-size: 12px; font-weight: 800; }
-    body.light .poke-badge { color: #b45309; }
-    .call-badge { display: inline-block; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.45); color: #34d399; padding: 12px 16px; border-radius: 16px; font-size: 12px; text-align: left; }
-    body.light .call-badge { color: #047857; }
-    .btn-join { margin-top: 8px; background: #10b981; color: #020617; border: 0; padding: 7px 14px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; display: inline-block; }
-
-    /* INDICADOR ESCRIBIENDO Y BARRA DE RESPUESTA */
-    .typing-bar { height: 20px; padding: 0 18px; font-size: 11px; color: #60a5fa; font-style: italic; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-flex-shrink: 0; flex-shrink: 0; }
-    .reply-bar { padding: 7px 16px; background: #0f172a; border-top: 1px solid #1e293b; font-size: 11.5px; color: #cbd5e1; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; -webkit-flex-shrink: 0; flex-shrink: 0; }
-    body.light .reply-bar { background: #f1f5f9; border-top-color: #cbd5e1; color: #334155; }
-
-    /* INPUT BAR */
-    .input-bar { padding: 10px 16px 12px; border-top: 1px solid #1e293b; background: #0f172a; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-flex-shrink: 0; flex-shrink: 0; }
-    body.light .input-bar { background: #ffffff; border-top-color: #e2e8f0; }
-    .btn-task { background: #1e293b; border: 1px solid #334155; color: #34d399; width: 42px; height: 42px; border-radius: 12px; font-size: 16px; cursor: pointer; margin-right: 6px; -webkit-flex-shrink: 0; flex-shrink: 0; }
-    .btn-task.active { background: #059669; border-color: #10b981; color: #fff; }
-    .btn-buzz { background: #f59e0b; color: #020617; border: 0; width: 42px; height: 42px; border-radius: 12px; font-size: 18px; cursor: pointer; margin-right: 6px; -webkit-flex-shrink: 0; flex-shrink: 0; font-weight: bold; }
-    .btn-clip { margin-right: 6px; -webkit-flex-shrink: 0; flex-shrink: 0; width: 42px; height: 42px; border-radius: 12px; }
-    .text-input { -webkit-flex: 1; flex: 1; height: 42px; background: #020617; border: 1px solid #1e293b; border-radius: 12px; padding: 0 14px; color: inherit; font-size: 14px; margin-right: 8px; }
-    body.light .text-input { background: #f8fafc; border-color: #cbd5e1; }
-    .btn-send { background: #2563eb; color: #fff; border: 0; height: 42px; padding: 0 18px; border-radius: 12px; font-weight: 600; font-size: 13px; cursor: pointer; -webkit-flex-shrink: 0; flex-shrink: 0; }
-
-    /* MODAL VIDEOLLAMADA */
-    .call-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #020617; z-index: 100; display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; }
-    .call-top { height: 54px; padding: 0 16px; background: #0f172a; border-bottom: 1px solid #1e293b; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: space-between; justify-content: space-between; color: #fff; font-size: 13px; font-weight: 700; }
-    .btn-hangup { background: #dc2626; color: #fff; border: 0; padding: 8px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
-    .call-frame { -webkit-flex: 1; flex: 1; width: 100%; height: 100%; background: #000; }
-    .call-frame iframe { width: 100%; height: 100%; border: 0; }
-
-    @media (max-width: 768px) {
-      .sidebar { position: fixed; top: 0; left: 0; bottom: 0; -webkit-transform: translateX(-100%); transform: translateX(-100%); }
-      .sidebar.open { -webkit-transform: translateX(0); transform: translateX(0); }
-      .mobile-only { display: -webkit-inline-flex; display: inline-flex; }
-    }
-
-    @-webkit-keyframes msn-shake {
-      0%, 100% { -webkit-transform: translate(0, 0) rotate(0deg); }
-      10%, 50% { -webkit-transform: translate(-16px, -12px) rotate(-2.5deg); }
-      20%, 60% { -webkit-transform: translate(16px, 12px) rotate(2.5deg); }
-      30%, 70% { -webkit-transform: translate(-16px, 10px) rotate(-2deg); }
-      40%, 80% { -webkit-transform: translate(16px, -10px) rotate(2deg); }
-      90% { -webkit-transform: translate(-6px, 4px) rotate(-0.5deg); }
-    }
-    @keyframes msn-shake {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      10%, 50% { transform: translate(-16px, -12px) rotate(-2.5deg); }
-      20%, 60% { transform: translate(16px, 12px) rotate(2.5deg); }
-      30%, 70% { transform: translate(-16px, 10px) rotate(-2deg); }
-      40%, 80% { transform: translate(16px, -10px) rotate(2deg); }
-      90% { transform: translate(-6px, 4px) rotate(-0.5deg); }
-    }
-    .msn-buzz { -webkit-animation: msn-shake 0.8s both; animation: msn-shake 0.8s both; }
+    .icon-btn { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; width: 30px; height: 30px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
   </style>
 </head>
-<body class="dark">
+<body>
   <div id="err-bar" class="error-banner hidden">
     <span id="err-txt"></span>
-    <button onclick="document.getElementById('err-bar').className='error-banner hidden'" style="background:transparent;border:0;color:#fff;text-decoration:underline;cursor:pointer">Cerrar</button>
+    <button onclick="document.getElementById('err-bar').className='error-banner hidden'" style="background:transparent;border:0;color:#fff;cursor:pointer">Cerrar</button>
   </div>
 
   <div id="login-view" class="login-screen">
     <div class="login-card">
       <div class="logo-box">⚡</div>
-      <h1>NEFA Software Chat</h1>
-      <p>Ingresa tu nombre para conectarte en vivo con el equipo</p>
+      <h1>NEFA iPad 2</h1>
+      <p>Ingresa tu nombre para entrar</p>
       <form id="login-form">
         <label>Tu Nombre:</label>
-        <input id="login-input" type="text" value="Franco Sierralta" placeholder="Ej. Franco, Ariel, Melany..." required>
-        <button type="submit" class="btn-login">Entrar al Chat →</button>
+        <input id="login-input" type="text" value="Franco Sierralta" required>
+        <button type="submit" class="btn-login">Entrar →</button>
       </form>
     </div>
   </div>
 
   <div id="app-view" class="app-wrap hidden">
-    <div id="sb-backdrop" class="backdrop hidden"></div>
-
-    <aside id="sidebar" class="sidebar">
-      <div class="sb-header">
-        <div class="brand">
-          <div class="brand-icon">N</div>
-          <div>
-            <div class="brand-title">NEFA Software</div>
-            <div id="sb-online-user" class="brand-sub">● En vivo</div>
-          </div>
-        </div>
-        <div>
-          <button id="sound-btn" class="icon-btn" type="button" title="Sonido">🔊</button>
-          <button id="theme-btn" class="icon-btn" type="button" title="Tema">☀️</button>
-          <button id="close-sb-btn" class="icon-btn mobile-only" type="button">✕</button>
-        </div>
-      </div>
-
-      <div class="sb-scroll">
-        <div class="sb-section">
-          <span>CANALES</span>
-          <button id="toggle-add-ch" class="btn-add-ch" type="button">+ Nuevo</button>
-        </div>
-
-        <div id="add-ch-box" class="new-ch-box hidden">
-          <input id="new-ch-name" type="text" placeholder="Nombre (ej. ventas)">
-          <input id="new-ch-desc" type="text" placeholder="Descripción">
-          <div class="new-ch-actions">
-            <button id="cancel-add-ch" type="button" style="background:transparent;color:#94a3b8">Cancelar</button>
-            <button id="save-add-ch" type="button" style="background:#2563eb;color:#fff">Crear</button>
-          </div>
-        </div>
-
-        <div id="ch-list" class="ch-list"></div>
-
-        <div class="sb-section" style="margin-top:8px">
-          <span>EQUIPO EN LÍNEA</span>
-          <span id="online-count" style="color:#10b981">1 activo</span>
-        </div>
-        <div id="presence-list" class="presence-list"></div>
-      </div>
-
-      <div class="sb-footer">
-        <div class="sb-footer-top">
-          <div class="user-box">
-            <div id="u-avatar" class="avatar">FS</div>
-            <div style="overflow:hidden">
-              <div id="u-name" class="u-name">Franco</div>
-              <div id="u-custom-display" class="u-custom-msg" title="Frase personal">✏️ Escribir frase...</div>
-            </div>
-          </div>
-          <button id="logout-btn" class="btn-logout" type="button">Cambiar</button>
-        </div>
-        <div class="msn-controls">
-          <select id="status-select" class="status-select">
-            <option value="online">🟢 Conectado</option>
-            <option value="away">🟠 Ausente</option>
-            <option value="busy">🔴 Ocupado</option>
-          </select>
-          <button id="edit-custom-btn" class="btn-status-msg" type="button">💬 Frase</button>
-        </div>
-      </div>
-    </aside>
-
-    <main class="chat-main">
-      <header class="chat-top">
-        <div class="top-left">
-          <button id="open-sb-btn" class="icon-btn mobile-only" type="button" style="margin-right:10px">☰</button>
-          <div style="overflow:hidden">
-            <div id="active-ch-name" class="top-title"># general</div>
-            <div id="active-ch-desc" class="top-desc">Canal en vivo</div>
-          </div>
-        </div>
-        <div class="top-actions">
-          <div id="search-box" class="search-box hidden">
-            <input id="search-input" type="text" placeholder="Buscar...">
-            <button id="search-clear" class="search-close" type="button">✕</button>
-          </div>
-          <button id="btn-search" class="icon-btn" type="button" title="Buscar">🔍</button>
-          <button id="btn-voice" class="icon-btn" type="button" title="Voz">📞</button>
-          <button id="btn-video" class="icon-btn" type="button" title="Video">📹</button>
-        </div>
-      </header>
-
-      <div id="pin-bar" class="pin-bar hidden">
-        <div id="pin-text" class="pin-text"></div>
-        <button id="btn-unpin" class="btn-unpin" type="button">Desfijar</button>
-      </div>
-
-      <div id="msg-area" class="msg-area"></div>
-
-      <div id="typing-bar" class="typing-bar"></div>
-
-      <div id="reply-bar" class="reply-bar hidden">
-        <div id="reply-text" style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:10px"></div>
-        <button id="reply-cancel" type="button" style="background:transparent;border:0;color:#94a3b8;cursor:pointer;font-weight:bold">✕</button>
-      </div>
-
-      <div class="input-bar">
-        <label class="icon-btn btn-clip" title="Adjuntar">
-          📎
-          <input id="file-input" type="file" style="display:none">
-        </label>
-        <button id="btn-task" class="btn-task" type="button" title="Tarea">☑️</button>
-        <button id="btn-buzz" class="btn-buzz" type="button" title="Zumbido">🔔</button>
-        <input id="msg-input" class="text-input" type="text" placeholder="Mensaje..." autocomplete="off">
-        <button id="btn-send" class="btn-send" type="button">Enviar</button>
-      </div>
-    </main>
-  </div>
-
-  <div id="call-modal" class="call-modal hidden">
-    <div class="call-top">
-      <span id="call-title">● Sala en vivo</span>
+    <header class="top-tabs">
+      <div style="font-weight:bold;font-size:12px;">⚡ NEFA iPad</div>
       <div>
-        <a id="call-ext" href="#" target="_blank" style="color:#60a5fa;margin-right:14px;font-size:12px">Ventana</a>
-        <button id="btn-hangup" class="btn-hangup" type="button">Salir</button>
+        <button id="tab-chat" class="tab-btn active" onclick="switchTab('chat')">Chat</button>
+        <button id="tab-clients" class="tab-btn" onclick="switchTab('clients')">Clientes</button>
+        <button id="tab-comex" class="tab-btn" onclick="switchTab('comex')">CBM / Comex</button>
+      </div>
+    </header>
+
+    <!-- VISTA CHAT -->
+    <div id="view-chat" class="view-container chat-layout">
+      <div id="sb-backdrop" class="backdrop hidden" onclick="toggleSidebar(false)"></div>
+      <aside id="sidebar" class="sidebar">
+        <div class="sb-header">
+          <span style="font-size:12px;font-weight:bold;">Canales</span>
+          <button class="icon-btn" onclick="toggleSidebar(false)">✕</button>
+        </div>
+        <div id="ch-list" class="sb-scroll"></div>
+      </aside>
+
+      <main class="chat-main">
+        <header class="chat-top">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button class="icon-btn" onclick="toggleSidebar(true)">☰</button>
+            <span id="active-ch-title"># general</span>
+          </div>
+          <button class="icon-btn" onclick="sendPoke()">🔔</button>
+        </header>
+        <div id="msg-area" class="msg-area"></div>
+        <div class="input-bar">
+          <input id="msg-input" class="text-input" type="text" placeholder="Escribe un mensaje..." autocomplete="off">
+          <button class="btn-send" onclick="sendMsg()">Enviar</button>
+        </div>
+      </main>
+    </div>
+
+    <!-- VISTA CLIENTES -->
+    <div id="view-clients" class="view-container p-content hidden">
+      <div class="card">
+        <h2>Gestión de Clientes & Firebase</h2>
+        <div class="field-row"><label>Nombre:</label><input id="cli-name" type="text" placeholder="Juan Pérez"></div>
+        <div class="field-row"><label>Teléfono / Contacto:</label><input id="cli-phone" type="text" placeholder="+54 9 351..."></div>
+        <div class="field-row"><label>Debe ($):</label><input id="cli-debt" type="number" placeholder="0"></div>
+        <button class="btn-action" onclick="createClient()">Guardar Cliente</button>
+      </div>
+      <div class="card">
+        <h2>Listado de Clientes</h2>
+        <table class="table-box">
+          <thead><tr><th>Cliente</th><th>Teléfono</th><th>Debe</th></tr></thead>
+          <tbody id="clients-table-body"></tbody>
+        </table>
       </div>
     </div>
-    <div id="call-frame" class="call-frame"></div>
+
+    <!-- VISTA COMEX & CBM -->
+    <div id="view-comex" class="view-container p-content hidden">
+      <div class="card">
+        <h2>Calculadora Express CBM (m³)</h2>
+        <div style="display:flex;gap:6px;">
+          <div class="field-row" style="flex:1;"><label>Largo cm</label><input id="c-l" type="number" placeholder="60"></div>
+          <div class="field-row" style="flex:1;"><label>Ancho cm</label><input id="c-w" type="number" placeholder="40"></div>
+          <div class="field-row" style="flex:1;"><label>Alto cm</label><input id="c-h" type="number" placeholder="40"></div>
+          <div class="field-row" style="flex:1;"><label>Cant.</label><input id="c-q" type="number" placeholder="100"></div>
+        </div>
+        <button class="btn-action" onclick="calcCbm()">Calcular CBM</button>
+        <div id="cbm-res" style="margin-top:8px;font-size:12px;font-weight:bold;color:#34d399;"></div>
+      </div>
+    </div>
   </div>
 
   <script>
     (function () {
       var SB_URL = 'https://fedzgvgobjeokxfhvmok.supabase.co';
       var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlZHpndmdvYmplb2t4Zmh2bW9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1MzE4OTksImV4cCI6MjExMDEwNzg5OX0.tnxHWDOWQySJ8VDIQhYX5hmVHGvJCD7UlMrw7XeI2ZY';
-
-      var state = {
-        user: '', chatId: 'gen-1', channels: [], messages: [], presence: [],
-        myStatus: 'online', myCustom: '', isTyping: false, lastTypedAt: 0,
-        replyTo: null, searchQuery: '', lastPinnedMsg: null,
-        lastMsgId: null, timer: null, titleTimer: null, dark: true, soundEnabled: true
-      };
+      var state = { user: '', chatId: 'gen-1', channels: [], timer: null };
 
       function el(id) { return document.getElementById(id); }
-      function show(id, yes) { el(id).className = el(id).className.replace(/\s*hidden\b/g, '') + (yes ? '' : ' hidden'); }
-      function setErr(m) { if (!m) { show('err-bar', false); return; } el('err-txt').textContent = m; show('err-bar', true); }
-      function nowTime() { var d = new Date(), h = d.getHours(), m = d.getMinutes(); return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m); }
 
-      function api(method, path, body, headersExtra, cb) {
+      window.switchTab = function(tab) {
+        el('view-chat').className = 'view-container chat-layout' + (tab === 'chat' ? '' : ' hidden');
+        el('view-clients').className = 'view-container p-content' + (tab === 'clients' ? '' : ' hidden');
+        el('view-comex').className = 'view-container p-content' + (tab === 'comex' ? '' : ' hidden');
+        el('tab-chat').className = 'tab-btn' + (tab === 'chat' ? ' active' : '');
+        el('tab-clients').className = 'tab-btn' + (tab === 'clients' ? ' active' : '');
+        el('tab-comex').className = 'tab-btn' + (tab === 'comex' ? ' active' : '');
+        if (tab === 'clients') loadClients();
+      };
+
+      function api(method, path, body, cb) {
         var x = new XMLHttpRequest();
         x.open(method, SB_URL + '/rest/v1/' + path, true);
         x.setRequestHeader('apikey', SB_KEY);
         x.setRequestHeader('Authorization', 'Bearer ' + SB_KEY);
         x.setRequestHeader('Content-Type', 'application/json');
-        if (headersExtra) {
-          for (var k in headersExtra) x.setRequestHeader(k, headersExtra[k]);
-        } else if (method !== 'GET') {
-          x.setRequestHeader('Prefer', 'return=representation');
-        }
+        if (method !== 'GET') x.setRequestHeader('Prefer', 'return=representation');
         x.onreadystatechange = function () {
           if (x.readyState === 4) {
             if (x.status >= 200 && x.status < 300) {
               var d = null; try { d = x.responseText ? JSON.parse(x.responseText) : null; } catch (e) {}
               if (cb) cb(null, d);
-            } else {
-              var msg = 'HTTP ' + x.status;
-              try { var j = JSON.parse(x.responseText); if (j && j.message) msg = j.message; } catch (e) {}
-              if (cb) cb(msg, null);
-            }
+            } else { if (cb) cb('HTTP ' + x.status, null); }
           }
         };
         x.send(body ? JSON.stringify(body) : null);
       }
 
-      function playMsnMessageSound(isMention) {
-        if (!state.soundEnabled || state.myStatus === 'busy') return;
-        try {
-          var Ctx = window.AudioContext || window.webkitAudioContext;
-          if (!Ctx) return;
-          var c = new Ctx();
-          var notes = isMention
-            ? [{ f: 783.99, t: 0, d: 0.08 }, { f: 1046.5, t: 0.09, d: 0.08 }, { f: 783.99, t: 0.18, d: 0.08 }, { f: 1318.51, t: 0.27, d: 0.25 }]
-            : [{ f: 587.33, t: 0, d: 0.09 }, { f: 880.0, t: 0.10, d: 0.09 }, { f: 1174.66, t: 0.20, d: 0.22 }];
-          for (var i = 0; i < notes.length; i++) {
-            (function (n) {
-              var o = c.createOscillator(), g = c.createGain();
-              o.type = 'sine'; o.frequency.value = n.f;
-              g.gain.setValueAtTime(0.2, c.currentTime + n.t);
-              g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + n.t + n.d);
-              o.connect(g); g.connect(c.destination);
-              o.start(c.currentTime + n.t); o.stop(c.currentTime + n.t + n.d);
-            })(notes[i]);
+      window.toggleSidebar = function(open) {
+        var sb = el('sidebar');
+        sb.className = 'sidebar' + (open ? ' open' : '');
+        el('sb-backdrop').className = 'backdrop' + (open ? '' : ' hidden');
+      };
+
+      function loadChannels() {
+        api('GET', 'channels?select=*', null, function(err, data) {
+          if (!err && data) {
+            state.channels = data;
+            var box = el('ch-list'); box.innerHTML = '';
+            for (var i = 0; i < data.length; i++) {
+              (function(ch) {
+                var d = document.createElement('div');
+                d.className = 'ch-item' + (ch.id === state.chatId ? ' active' : '');
+                d.textContent = '# ' + ch.name;
+                d.onclick = function() { state.chatId = ch.id; el('active-ch-title').textContent = '# ' + ch.name; toggleSidebar(false); loadChannels(); loadMessages(); };
+                box.appendChild(d);
+              })(data[i]);
+            }
           }
-        } catch (e) {}
+        });
       }
 
-      function flashTabTitle(senderName, isMention) {
-        if (state.titleTimer) clearInterval(state.titleTimer);
-        var toggle = false;
-        state.titleTimer = setInterval(function () {
-          document.title = toggle ? 'NEFA Software Chat' : (isMention ? ('🔔 ¡' + senderName + ' te mencionó!') : ('💬 ¡Mensaje de ' + senderName + '!'));
-          toggle = !toggle;
-        }, 900);
+      function loadMessages() {
+        api('GET', 'messages?select=*&channel_id=eq.' + encodeURIComponent(state.chatId) + '&order=created_at.asc', null, function(err, data) {
+          if (!err && data) {
+            var area = el('msg-area'); area.innerHTML = '';
+            for (var i = 0; i < data.length; i++) {
+              var m = data[i], me = m.sender && m.sender.toLowerCase() === state.user.toLowerCase();
+              var row = document.createElement('div'); row.className = 'msg-row' + (me ? ' me' : '');
+              var bb = document.createElement('div'); bb.className = 'msg-bubble';
+              bb.textContent = (m.sender !== state.user ? '[' + m.sender + '] ' : '') + (m.text || '');
+              row.appendChild(bb); area.appendChild(row);
+            }
+            area.scrollTop = area.scrollHeight;
+          }
+        });
       }
 
-      window.onfocus = function () {
-        if (state.titleTimer) {
-          clearInterval(state.titleTimer);
-          state.titleTimer = null;
-          document.title = 'NEFA Software Chat';
+      window.sendMsg = function() {
+        var inp = el('msg-input'), txt = inp.value.replace(/^\s+|\s+$/g, '');
+        if (!txt) return;
+        inp.value = '';
+        var msg = { id: 'msg-' + new Date().getTime(), channel_id: state.chatId, sender: state.user, text: txt, time: '12:00', type: 'text' };
+        api('POST', 'messages', [msg], function() { loadMessages(); });
+      };
+
+      window.sendPoke = function() {
+        var msg = { id: 'msg-' + new Date().getTime(), channel_id: state.chatId, sender: state.user, text: '⚡ ¡Zumbido!', time: '12:00', type: 'poke' };
+        api('POST', 'messages', [msg], function() { loadMessages(); });
+      };
+
+      window.createClient = function() {
+        var name = el('cli-name').value, phone = el('cli-phone').value, debt = parseFloat(el('cli-debt').value) || 0;
+        if (!name) return;
+        var c = { id: 'cli-' + Date.now(), name: name, phone: phone, total_debt: debt, shipment_status: 'En Aduana' };
+        api('POST', 'clients', [c], function(err) {
+          if (!err) { el('cli-name').value = ''; el('cli-phone').value = ''; el('cli-debt').value = ''; loadClients(); }
+        });
+      };
+
+      function loadClients() {
+        api('GET', 'clients?select=*&order=created_at.desc', null, function(err, data) {
+          if (!err && data) {
+            var tb = el('clients-table-body'); tb.innerHTML = '';
+            for (var i = 0; i < data.length; i++) {
+              var c = data[i], tr = document.createElement('tr');
+              tr.innerHTML = '<td><b>' + c.name + '</b></td><td>' + (c.phone || '-') + '</td><td>$' + (c.total_debt || 0) + '</td>';
+              tb.appendChild(tr);
+            }
+          }
+        });
+      }
+
+      window.calcCbm = function() {
+        var l = parseFloat(el('c-l').value) || 0, w = parseFloat(el('c-w').value) || 0, h = parseFloat(el('c-h').value) || 0, q = parseFloat(el('c-q').value) || 0;
+        if (l && w && h && q) {
+          var res = ((l * w * h * q) / 1000000).toFixed(3);
+          el('c-cbm-res').textContent = 'Total: ' + res + ' m³';
         }
       };
 
-      function buzzEffect() {
-        var b = document.body;
-        b.className = b.className.replace(/\s*msn-buzz\b/g, '');
-        setTimeout(function () { b.className += ' msn-buzz'; }, 20);
-        setTimeout(function () { b.className = b.className.replace(/\s*msn-buzz\b/g, ''); }, 900);
-        if (navigator.vibrate) navigator.vibrate([120, 40, 120, 40, 220]);
-        if (!state.soundEnabled) return;
-        try {
-          var Ctx = window.AudioContext || window.webkitAudioContext;
-          if (Ctx) {
-            var c = new Ctx(), ts = [0, 0.08, 0.16, 0.24, 0.32, 0.40, 0.48];
-            for (var i = 0; i < ts.length; i++) {
-              (function (t, idx) {
-                var o = c.createOscillator(), g = c.createGain();
-                o.type = 'sawtooth'; o.frequency.value = (idx % 2 === 0) ? 340 : 460;
-                g.gain.value = 0.16; o.connect(g); g.connect(c.destination);
-                o.start(c.currentTime + t); o.stop(c.currentTime + t + 0.06);
-              })(ts[i], i);
-            }
-          }
-        } catch (e) {}
-      }
-
-      function syncPresence(typingChannel) {
-        if (!state.user) return;
-        var typingVal = (typeof typingChannel === 'string') ? typingChannel : (state.isTyping ? state.chatId : '');
-        var payload = {
-          username: state.user,
-          status: state.myStatus,
-          custom_status: state.myCustom,
-          typing_in: typingVal,
-          typing_at: new Date().toISOString(),
-          last_seen: new Date().toISOString()
-        };
-        api('POST', 'presence?on_conflict=username', [payload], { 'Prefer': 'resolution=merge-duplicates,return=minimal' }, function () {
-          api('GET', 'presence?select=*&order=username.asc', null, null, function (err, list) {
-            if (!err && list) {
-              state.presence = list;
-              renderPresence();
-            }
-          });
-        });
-      }
-
-      function renderPresence() {
-        var box = el('presence-list');
-        box.innerHTML = '';
-        var now = new Date().getTime();
-        var activeCount = 0;
-        var typingUsers = [];
-
-        var rosterMap = {};
-        for (var p = 0; p < state.presence.length; p++) {
-          if (state.presence[p].username) rosterMap[state.presence[p].username.toLowerCase()] = state.presence[p];
-        }
-        rosterMap[state.user.toLowerCase()] = { username: state.user, status: state.myStatus, custom_status: state.myCustom, last_seen: new Date().toISOString() };
-        
-        for (var m = 0; m < state.messages.length; m++) {
-          var snd = state.messages[m].sender;
-          if (snd && snd !== '🤖 NEFA AI' && !rosterMap[snd.toLowerCase()]) {
-            rosterMap[snd.toLowerCase()] = { username: snd, status: 'online', custom_status: '', last_seen: new Date().toISOString() };
-          }
-        }
-
-        var roster = [];
-        for (var k in rosterMap) { if (rosterMap.hasOwnProperty(k)) roster.push(rosterMap[k]); }
-
-        for (var i = 0; i < roster.length; i++) {
-          (function (p) {
-            var seenDiff = now - new Date(p.last_seen).getTime();
-            var isOnline = seenDiff < 90000;
-            if (isOnline) activeCount++;
-
-            var row = document.createElement('div');
-            row.className = 'user-presence-item';
-            row.title = 'Tocá para mencionar con @';
-            row.onclick = function () {
-              var shortName = p.username.split(' ')[0];
-              el('msg-input').value = el('msg-input').value + '@' + shortName + ' ';
-              toggleSidebar(false);
-              el('msg-input').focus();
-            };
-
-            var dot = document.createElement('span');
-            var stClass = !isOnline ? 'dot-offline' : (p.status === 'away' ? 'dot-away' : (p.status === 'busy' ? 'dot-busy' : 'dot-online'));
-            dot.className = 'status-dot ' + stClass;
-            row.appendChild(dot);
-
-            var info = document.createElement('div');
-            info.className = 'up-info';
-            var nm = document.createElement('div');
-            nm.className = 'up-name';
-            var labelStatus = !isOnline ? ' (Desconectado)' : (p.status === 'away' ? ' (Ausente)' : (p.status === 'busy' ? ' (Ocupado)' : ''));
-            nm.textContent = p.username + labelStatus;
-            info.appendChild(nm);
-
-            if (p.custom_status) {
-              var cs = document.createElement('div');
-              cs.className = 'up-custom';
-              cs.textContent = '“' + p.custom_status + '”';
-              info.appendChild(cs);
-            }
-            row.appendChild(info);
-            box.appendChild(row);
-          })(roster[i]);
-        }
-
-        el('online-count').textContent = (activeCount || 1) + ((activeCount || 1) === 1 ? ' activo' : ' activos');
-      }
-
-      function toggleSidebar(open) {
-        var sb = el('sidebar');
-        sb.className = sb.className.replace(/\s*open\b/g, '') + (open ? ' open' : '');
-        show('sb-backdrop', open);
-      }
-
-      function getActiveCh() {
-        for (var i = 0; i < state.channels.length; i++) {
-          if (String(state.channels[i].id) === String(state.chatId)) return state.channels[i];
-        }
-        return null;
-      }
-
-      function renderChannels() {
-        var box = el('ch-list'); box.innerHTML = '';
-        for (var i = 0; i < state.channels.length; i++) {
-          (function (ch) {
-            var item = document.createElement('div');
-            item.className = 'ch-item' + (String(ch.id) === String(state.chatId) ? ' active' : '');
-            var info = document.createElement('div'); info.className = 'ch-info';
-            var nm = document.createElement('div'); nm.className = 'ch-name'; nm.textContent = '# ' + ch.name;
-            var ds = document.createElement('div'); ds.className = 'ch-desc'; ds.textContent = ch.description || '';
-            info.appendChild(nm); if (ch.description) info.appendChild(ds);
-            item.appendChild(info);
-
-            var btns = document.createElement('div'); btns.className = 'ch-btns';
-            var eb = document.createElement('button'); eb.type = 'button'; eb.textContent = '✎';
-            eb.onclick = function (e) {
-              e.stopPropagation();
-              var n = prompt('Nombre del canal:', ch.name);
-              if (!n || !n.replace(/^\s+|\s+$/g, '')) return;
-              var d = prompt('Descripción:', ch.description || '');
-              api('PATCH', 'channels?id=eq.' + encodeURIComponent(ch.id), {
-                name: n.replace(/^\s+|\s+$/g, '').toLowerCase().replace(/\s+/g, '-'),
-                description: d !== null ? d : ch.description
-              }, null, function () { loadChannels(); });
-            };
-            btns.appendChild(eb);
-
-            if (state.channels.length > 1) {
-              var db = document.createElement('button'); db.type = 'button'; db.textContent = '🗑';
-              db.onclick = function (e) {
-                e.stopPropagation();
-                if (!confirm('¿Eliminar #' + ch.name + '?')) return;
-                api('DELETE', 'messages?channel_id=eq.' + encodeURIComponent(ch.id), null, null, function () {
-                  api('DELETE', 'channels?id=eq.' + encodeURIComponent(ch.id), null, null, function () { loadChannels(true); });
-                });
-              };
-              btns.appendChild(db);
-            }
-            item.appendChild(btns);
-            item.onclick = function () {
-              state.chatId = ch.id; state.lastMsgId = null;
-              clearReply();
-              toggleSidebar(false); renderChannels(); updateHeader(); loadMessages(true);
-            };
-            box.appendChild(item);
-          })(state.channels[i]);
-        }
-      }
-
-      function updateHeader() {
-        var c = getActiveCh();
-        el('active-ch-name').textContent = '# ' + (c ? c.name : 'general');
-        el('active-ch-desc').textContent = c ? (c.description || 'Canal en vivo') : '';
-      }
-
-      function loadChannels(reloadMsgs) {
-        api('GET', 'channels?select=*', null, null, function (err, data) {
-          if (!err && data && data.length > 0) {
-            state.channels = data;
-            if (!getActiveCh()) state.chatId = data[0].id;
-            renderChannels(); updateHeader();
-            if (reloadMsgs) loadMessages(true);
-          }
-        });
-      }
-
-      function togglePinMessage(m) {
-        var newType = (m.type === 'pinned') ? 'text' : 'pinned';
-        api('PATCH', 'messages?id=eq.' + encodeURIComponent(m.id), { type: newType }, null, function (err) {
-          if (!err) loadMessages(false);
-        });
-      }
-
-      function toggleTaskMessage(m) {
-        var raw = m.text || '';
-        var updated = raw;
-        var shortName = state.user.split(' ')[0];
-        if (raw.indexOf('[ ] ') !== -1) {
-          updated = raw.replace('[ ] ', '[x] ') + ' (✓ ' + shortName + ')';
-        } else if (raw.indexOf('[x] ') !== -1) {
-          updated = raw.replace('[x] ', '[ ] ').replace(/\s*\(✓ [^)]+\)$/, '');
-        } else {
-          return;
-        }
-        api('PATCH', 'messages?id=eq.' + encodeURIComponent(m.id), { text: updated }, null, function (err) {
-          if (!err) loadMessages(false);
-        });
-      }
-
-      function startReply(m) {
-        state.replyTo = m;
-        var clean = (m.text || '').replace(/^❝ [^\n]+\n/, '').substring(0, 60);
-        el('reply-text').textContent = '↩️ Respondiendo a ' + m.sender + ': ' + clean;
-        show('reply-bar', true);
-        el('msg-input').focus();
-      }
-
-      function clearReply() {
-        state.replyTo = null;
-        show('reply-bar', false);
-      }
-
-      function appendFormattedText(container, text) {
-        var parts = String(text || '').split(/(@[\wáéíóúÁÉÍÓÚñÑ.-]+)/g);
-        for (var i = 0; i < parts.length; i++) {
-          var part = parts[i];
-          if (part.indexOf('@') === 0 && part.length > 1) {
-            var sp = document.createElement('span');
-            sp.className = 'mention-tag';
-            sp.textContent = part;
-            container.appendChild(sp);
-          } else if (part) {
-            container.appendChild(document.createTextNode(part));
-          }
-        }
-      }
-
-      function loadMessages(initial) {
-        if (!state.chatId) return;
-        api('GET', 'messages?select=*&channel_id=eq.' + encodeURIComponent(state.chatId) + '&order=created_at.asc', null, null, function (err, data) {
-          if (!err && data) {
-            state.messages = data;
-            if (data.length > 0) {
-              var last = data[data.length - 1];
-              if (!initial && state.lastMsgId && state.lastMsgId !== last.id) {
-                var fromOther = last.sender.toLowerCase() !== state.user.toLowerCase();
-                if (fromOther) {
-                  var firstName = state.user.split(' ')[0].toLowerCase();
-                  var lowTxt = (last.text || '').toLowerCase();
-                  var isMention = lowTxt.indexOf('@' + firstName) !== -1 || lowTxt.indexOf('@' + state.user.toLowerCase()) !== -1;
-                  if (last.type === 'poke') {
-                    buzzEffect();
-                  } else {
-                    playMsnMessageSound(isMention);
-                  }
-                  flashTabTitle(last.sender, isMention);
-                }
-              }
-              state.lastMsgId = last.id;
-            }
-            renderMessages();
-          }
-        });
-      }
-
-      function renderMessages() {
-        var list = state.messages;
-        var area = el('msg-area');
-        var nearBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) < 90;
-        area.innerHTML = '';
-
-        var pinnedList = [];
-        for (var p = 0; p < list.length; p++) {
-          if (list[p].type === 'pinned') pinnedList.push(list[p]);
-        }
-        if (pinnedList.length > 0) {
-          var lastPin = pinnedList[pinnedList.length - 1];
-          state.lastPinnedMsg = lastPin;
-          var cleanPin = (lastPin.text || '').replace(/^❝ [^\n]+\n/, '');
-          el('pin-text').textContent = '📌 Fijado (' + lastPin.sender + '): ' + cleanPin;
-          show('pin-bar', true);
-        } else {
-          state.lastPinnedMsg = null;
-          show('pin-bar', false);
-        }
-
-        var q = state.searchQuery.toLowerCase();
-        for (var i = 0; i < list.length; i++) {
-          (function (m) {
-            if (q) {
-              var matchTxt = (m.text || '').toLowerCase().indexOf(q) !== -1;
-              var matchSnd = (m.sender || '').toLowerCase().indexOf(q) !== -1;
-              if (!matchTxt && !matchSnd) return;
-            }
-
-            var isAi = m.type === 'ai' || m.sender === '🤖 NEFA AI';
-            var me = !isAi && m.sender && m.sender.toLowerCase() === state.user.toLowerCase();
-            if (m.type === 'poke') {
-              var ce = document.createElement('div'); ce.className = 'center-event';
-              var pb = document.createElement('div'); pb.className = 'poke-badge';
-              pb.textContent = '🔔 ¡' + m.sender + ' envió un Zumbido! ⚡ (' + (m.time || '') + ')';
-              ce.appendChild(pb); area.appendChild(ce);
-            } else if (m.type === 'call') {
-              var cc = document.createElement('div'); cc.className = 'center-event';
-              var cb = document.createElement('div'); cb.className = 'call-badge';
-              var st = document.createElement('div'); st.style.fontWeight = 'bold';
-              st.textContent = m.sender + ' ' + (m.text || 'inició llamada');
-              var jb = document.createElement('button'); jb.className = 'btn-join'; jb.textContent = 'Unirse';
-              jb.onclick = function () { startCall('video', false); };
-              cb.appendChild(st); cb.appendChild(jb); cc.appendChild(cb); area.appendChild(cc);
-            } else {
-              var row = document.createElement('div'); row.className = 'msg-row' + (me ? ' me' : '');
-              if (!me) {
-                var sn = document.createElement('span'); sn.className = 'msg-sender'; sn.textContent = m.sender;
-                row.appendChild(sn);
-              }
-
-              var flexWrap = document.createElement('div');
-              flexWrap.className = 'msg-flex';
-
-              var bb = document.createElement('div');
-              bb.className = 'msg-bubble' + (m.type === 'pinned' ? ' pinned-ring' : '');
-
-              var rawTxt = m.text || '';
-              var quoteHdr = null;
-              var mainTxt = rawTxt;
-              if (rawTxt.indexOf('❝ ') === 0) {
-                var nl = rawTxt.indexOf('\n');
-                if (nl !== -1) {
-                  quoteHdr = rawTxt.substring(0, nl);
-                  mainTxt = rawTxt.substring(nl + 1);
-                }
-              }
-
-              if (quoteHdr) {
-                var qBox = document.createElement('div');
-                qBox.className = 'quote-box';
-                qBox.textContent = quoteHdr;
-                bb.appendChild(qBox);
-              }
-
-              var isUnchecked = mainTxt.indexOf('[ ] ') === 0;
-              var isChecked = mainTxt.indexOf('[x] ') === 0;
-              if (isUnchecked || isChecked) {
-                var tRow = document.createElement('div');
-                tRow.className = 'task-row';
-                tRow.onclick = function () { toggleTaskMessage(m); };
-                var tBox = document.createElement('span');
-                tBox.className = 'task-box';
-                tBox.textContent = isChecked ? '☑️' : '⬜';
-                var tTxt = document.createElement('span');
-                if (isChecked) tTxt.className = 'task-done';
-                appendFormattedText(tTxt, mainTxt.substring(4));
-                tRow.appendChild(tBox);
-                tRow.appendChild(tTxt);
-                bb.appendChild(tRow);
-              } else {
-                var pTxt = document.createElement('div');
-                appendFormattedText(pTxt, mainTxt);
-                bb.appendChild(pTxt);
-              }
-
-              if (m.time) {
-                var tm = document.createElement('span');
-                tm.className = 'msg-time';
-                tm.textContent = (m.type === 'pinned' ? '📌 ' : '') + m.time + (me ? ' ✓✓' : '');
-                bb.appendChild(tm);
-              }
-
-              var acts = document.createElement('div');
-              acts.className = 'msg-actions';
-
-              var repBtn = document.createElement('button');
-              repBtn.type = 'button'; repBtn.className = 'act-btn'; repBtn.textContent = '↩️';
-              repBtn.onclick = function () { startReply(m); };
-
-              var pinBtn = document.createElement('button');
-              pinBtn.type = 'button'; pinBtn.className = 'act-btn' + (m.type === 'pinned' ? ' active-pin' : ''); pinBtn.textContent = '📌';
-              pinBtn.onclick = function () { togglePinMessage(m); };
-
-              acts.appendChild(repBtn); acts.appendChild(pinBtn);
-              flexWrap.appendChild(bb); flexWrap.appendChild(acts);
-              row.appendChild(flexWrap); area.appendChild(row);
-            }
-          })(list[i]);
-        }
-        if (nearBottom) area.scrollTop = area.scrollHeight;
-      }
-
-      function sendMsg(txt, type) {
-        state.isTyping = false;
-        var finalTxt = txt;
-        if (state.replyTo && (!type || type === 'text')) {
-          var cleanOrig = (state.replyTo.text || '').replace(/^❝ [^\n]+\n/, '').substring(0, 65);
-          finalTxt = '❝ @' + state.replyTo.sender + ': ' + cleanOrig + '\n' + txt;
-        }
-        clearReply();
-        el('btn-task').className = 'btn-task';
-
-        var msg = {
-          id: 'msg-' + new Date().getTime() + '-' + Math.floor(Math.random() * 9999),
-          channel_id: state.chatId, sender: state.user, text: finalTxt, time: nowTime(), type: type || 'text'
-        };
-        state.lastMsgId = msg.id;
-        api('POST', 'messages', [msg], null, function (err) {
-          if (!err) {
-            loadMessages(false);
-            syncPresence('');
-          }
-        });
-      }
-
-      function startCall(mode, announce) {
-        var room = 'NEFA_Software_Room_' + String(state.chatId).replace(/[^a-zA-Z0-9]/g, '_');
-        var url = 'https://meet.jit.si/' + room + '#userInfo.displayName="' + encodeURIComponent(state.user) + '"&config.prejoinPageEnabled=false&config.startWithVideoMuted=' + (mode === 'voice');
-        var ch = getActiveCh();
-        el('call-title').textContent = '● Sala en vivo: #' + (ch ? ch.name : 'general');
-        el('call-frame').innerHTML = '<iframe src="' + url + '" allow="camera; microphone; fullscreen; display-capture; autoplay"></iframe>';
-        show('call-modal', true);
-        if (announce) sendMsg('📞 Inició una ' + (mode === 'video' ? 'Videollamada' : 'Llamada de voz') + ' en vivo', 'call');
-      }
-
-      function promptCustomMessage() {
-        var val = prompt('Frase personal MSN:', state.myCustom || '');
-        if (val !== null) {
-          state.myCustom = val.replace(/^\s+|\s+$/g, '');
-          try { localStorage.setItem('nefa_custom_msg', state.myCustom); } catch (e) {}
-          el('u-custom-display').textContent = state.myCustom ? ('“' + state.myCustom + '”') : '✏️ Frase personal...';
-          syncPresence();
-        }
-      }
-
-      function enterApp(name) {
-        state.user = name;
-        try {
-          localStorage.setItem('nefa_username', name);
-          state.myCustom = localStorage.getItem('nefa_custom_msg') || '';
-          state.myStatus = localStorage.getItem('nefa_status') || 'online';
-        } catch (e) {}
-
-        el('u-name').textContent = name;
-        el('sb-online-user').textContent = '● En vivo (' + name + ')';
-        el('u-avatar').textContent = name.substring(0, 2).toUpperCase();
-        el('status-select').value = state.myStatus;
-        el('u-custom-display').textContent = state.myCustom ? ('“' + state.myCustom + '”') : '✏️ Frase personal...';
-
-        show('login-view', false); show('app-view', true);
-        loadChannels(true);
-        syncPresence();
-
-        if (state.timer) clearInterval(state.timer);
-        state.timer = setInterval(function () {
-          loadMessages(false);
-          loadChannels(false);
-          syncPresence();
-        }, 2000);
-      }
-
-      el('login-form').onsubmit = function (e) {
+      el('login-form').onsubmit = function(e) {
         if (e && e.preventDefault) e.preventDefault();
         var v = el('login-input').value.replace(/^\s+|\s+$/g, '');
-        if (v) enterApp(v);
+        if (v) {
+          state.user = v;
+          el('login-view').className = 'login-screen hidden';
+          el('app-view').className = 'app-wrap';
+          loadChannels(); loadMessages();
+          if (state.timer) clearInterval(state.timer);
+          state.timer = setInterval(function() { loadMessages(); loadChannels(); }, 3000);
+        }
         return false;
       };
-      el('logout-btn').onclick = function () {
-        try { localStorage.removeItem('nefa_username'); } catch (e) {}
-        if (state.timer) clearInterval(state.timer);
-        show('app-view', false); show('login-view', true);
-      };
-      el('status-select').onchange = function () {
-        state.myStatus = el('status-select').value;
-        try { localStorage.setItem('nefa_status', state.myStatus); } catch (e) {}
-        syncPresence();
-      };
-      el('edit-custom-btn').onclick = promptCustomMessage;
-      el('u-custom-display').onclick = promptCustomMessage;
-
-      el('sound-btn').onclick = function () {
-        state.soundEnabled = !state.soundEnabled;
-        el('sound-btn').textContent = state.soundEnabled ? '🔊' : '🔇';
-      };
-      el('theme-btn').onclick = function () {
-        state.dark = !state.dark;
-        document.body.className = state.dark ? 'dark' : 'light';
-        el('theme-btn').textContent = state.dark ? '☀️' : '🌙';
-      };
-      el('open-sb-btn').onclick = function () { toggleSidebar(true); };
-      el('close-sb-btn').onclick = function () { toggleSidebar(false); };
-      el('sb-backdrop').onclick = function () { toggleSidebar(false); };
-
-      el('btn-search').onclick = function () {
-        var isHidden = el('search-box').className.indexOf('hidden') !== -1;
-        show('search-box', isHidden);
-        if (isHidden) { el('search-input').focus(); } else { state.searchQuery = ''; el('search-input').value = ''; renderMessages(); }
-      };
-      el('search-input').onkeyup = function () { state.searchQuery = el('search-input').value; renderMessages(); };
-      el('search-clear').onclick = function () { state.searchQuery = ''; el('search-input').value = ''; show('search-box', false); renderMessages(); };
-      el('btn-unpin').onclick = function () { if (state.lastPinnedMsg) togglePinMessage(state.lastPinnedMsg); };
-      el('reply-cancel').onclick = clearReply;
-      el('btn-task').onclick = function () {
-        var inp = el('msg-input');
-        if (inp.value.indexOf('[ ] ') === 0) {
-          inp.value = inp.value.substring(4);
-          el('btn-task').className = 'btn-task';
-        } else {
-          inp.value = '[ ] ' + inp.value;
-          el('btn-task').className = 'btn-task active';
-        }
-        inp.focus();
-      };
-
-      el('toggle-add-ch').onclick = function () { show('add-ch-box', true); };
-      el('cancel-add-ch').onclick = function () { show('add-ch-box', false); };
-      el('save-add-ch').onclick = function () {
-        var n = el('new-ch-name').value.replace(/^\s+|\s+$/g, '');
-        if (!n) return;
-        var ch = { id: 'ch-' + new Date().getTime(), name: n.toLowerCase().replace(/\s+/g, '-'), description: el('new-ch-desc').value || 'Canal' };
-        api('POST', 'channels', [ch], null, function (err) {
-          if (!err) {
-            el('new-ch-name').value = ''; el('new-ch-desc').value = '';
-            show('add-ch-box', false); state.chatId = ch.id; loadChannels(true);
-          }
-        });
-      };
-      el('btn-send').onclick = function () {
-        var t = el('msg-input').value.replace(/^\s+|\s+$/g, '');
-        if (t) { el('msg-input').value = ''; sendMsg(t, 'text'); }
-      };
-      el('msg-input').onkeydown = function (e) {
-        if ((e.keyCode || e.which) === 13) {
-          if (e.preventDefault) e.preventDefault();
-          el('btn-send').click();
-        }
-      };
-      el('btn-buzz').onclick = function () { buzzEffect(); sendMsg('⚡ ¡Acaba de enviar un Zumbido!', 'poke'); };
-      el('file-input').onchange = function (e) {
-        var f = e.target.files && e.target.files[0];
-        if (f) sendMsg('📁 Archivo adjunto: ' + f.name, 'file');
-      };
-      el('btn-voice').onclick = function () { startCall('voice', true); };
-      el('btn-video').onclick = function () { startCall('video', true); };
-      el('btn-hangup').onclick = function () { el('call-frame').innerHTML = ''; show('call-modal', false); };
-
-      try {
-        var saved = localStorage.getItem('nefa_username');
-        if (saved && saved.replace(/^\s+|\s+$/g, '')) enterApp(saved);
-      } catch (e) {}
     })();
   </script>
 </body>
