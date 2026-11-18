@@ -1,47 +1,19 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
 
 :root {
-  --background: #030914;
+  --background: #020617;
   --foreground: #f1f5f9;
 }
 
 body {
-  background-color: var(--background);
+  background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
-  overflow: hidden;
-}
-
-/* Scrollbars personalizados estilo Midnight Teal */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #030914;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #115e59;
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #0d9488;
-}
-
-/* Animación del zumbido MSN */
-@keyframes msn-nudge { 
-  0%, 100% { transform: translate(0, 0); } 
-  20% { transform: translate(-16px, -12px); } 
-  40% { transform: translate(16px, 12px); } 
-  60% { transform: translate(-14px, 10px); } 
-  80% { transform: translate(14px, -10px); } 
-}
-
-.msn-buzz-active { 
-  animation: msn-nudge 0.8s ease-in-out both; 
+  /* Evita el "rebote" de la pantalla en celulares */
+  overscroll-behavior-y: none; 
 }
