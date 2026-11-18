@@ -4,7 +4,7 @@ import {
   Hash, Send, Paperclip, Sun, Moon, Phone, Video, CheckCheck, 
   Zap, ArrowRight, BellRing, Menu, X, Plus, Edit2, Trash2, Check, 
   AlertCircle, PhoneCall, Volume2, VolumeX, MessageSquare,
-  Pin, Search, Reply, CheckSquare, Square, Bot, Sparkles, Users, Package, Calculator, FileText, Share2, ExternalLink, Upload
+  Pin, Search, Reply, CheckSquare, Square, Bot, Sparkles, Users, Package, Calculator, FileText, Share2, ExternalLink, Upload, Bell
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://fedzgvgobjeokxfhvmok.supabase.co';
@@ -188,6 +188,7 @@ export default function App() {
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') ctx.resume();
       const notes = isMention
         ? [{ f: 783.99, t: 0, d: 0.08 }, { f: 1046.50, t: 0.09, d: 0.08 }, { f: 783.99, t: 0.18, d: 0.08 }, { f: 1318.51, t: 0.27, d: 0.25 }]
         : [{ f: 587.33, t: 0, d: 0.09 }, { f: 880.0, t: 0.10, d: 0.09 }, { f: 1174.66, t: 0.20, d: 0.22 }];
@@ -208,7 +209,7 @@ export default function App() {
     if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
     let toggle = false;
     titleIntervalRef.current = setInterval(() => {
-      document.title = toggle ? 'NEFA Software Chat' : (isMention ? `🔔 ¡${sender} te mencionó!` : `💬 ¡Mensaje de ${sender}!`);
+      document.title = toggle ? 'NEFA Software Workspace' : (isMention ? `🔔 ¡${sender} te mencionó!` : `💬 ¡Mensaje nuevo de ${sender}!`);
       toggle = !toggle;
     }, 900);
   }, []);
@@ -218,7 +219,7 @@ export default function App() {
       if (titleIntervalRef.current) {
         clearInterval(titleIntervalRef.current);
         titleIntervalRef.current = null;
-        document.title = 'NEFA Software Chat';
+        document.title = 'NEFA Software Workspace';
       }
     };
     window.addEventListener('focus', handleFocus);
@@ -234,6 +235,7 @@ export default function App() {
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') ctx.resume();
       const times = [0, 0.08, 0.16, 0.24, 0.32, 0.40, 0.48, 0.56];
       times.forEach((t, index) => {
         const osc = ctx.createOscillator();
@@ -710,10 +712,16 @@ export default function App() {
           <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-teal-600 to-cyan-400 flex items-center justify-center text-slate-950 font-bold text-xs">N</div>
           <span className="font-bold text-sm tracking-wide text-teal-100">NEFA Software Workspace</span>
         </div>
-        <div className="flex items-center gap-1 bg-[#030914]/60 p-1 rounded-xl border border-teal-950">
-          <button onClick={() => setActiveTab('chat')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${activeTab === 'chat' ? 'bg-teal-600 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'}`}><MessageSquare className="w-3.5 h-3.5" /> Chat</button>
-          <button onClick={() => setActiveTab('clients')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${activeTab === 'clients' ? 'bg-teal-600 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'}`}><Users className="w-3.5 h-3.5" /> Clientes & Firebase</button>
-          <button onClick={() => setActiveTab('comex')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${activeTab === 'comex' ? 'bg-teal-600 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'}`}><Package className="w-3.5 h-3.5" /> Comex & CBM</button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setSoundEnabled(!soundEnabled)} className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer border ${soundEnabled ? 'bg-teal-500/20 text-teal-300 border-teal-500/40' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+            {soundEnabled ? <Bell className="w-3.5 h-3.5 text-teal-400" /> : <BellRing className="w-3.5 h-3.5" />}
+            <span>{soundEnabled ? 'Notificaciones activas' : 'Silenciado'}</span>
+          </button>
+          <div className="flex items-center gap-1 bg-[#030914]/60 p-1 rounded-xl border border-teal-950">
+            <button onClick={() => setActiveTab('chat')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${activeTab === 'chat' ? 'bg-teal-600 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'}`}><MessageSquare className="w-3.5 h-3.5" /> Chat</button>
+            <button onClick={() => setActiveTab('clients')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${activeTab === 'clients' ? 'bg-teal-600 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'}`}><Users className="w-3.5 h-3.5" /> Clientes & Firebase</button>
+            <button onClick={() => setActiveTab('comex')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${activeTab === 'comex' ? 'bg-teal-600 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'}`}><Package className="w-3.5 h-3.5" /> Comex & CBM</button>
+          </div>
         </div>
       </div>
 
@@ -721,7 +729,7 @@ export default function App() {
         <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 bg-[#030914]">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-teal-100">Gestión de Clientes (Firebase Storage: <span className="text-teal-400 font-mono text-xs">sierraltaemiliano@gmail.com</span>)</h1>
+              <h1 className="text-xl font-bold tracking-tight text-teal-100">Gestión de Clientes (Firebase Storage: <span className="text-teal-400 font-mono text-xs">sierraltaemiliano@gmail.com</span>)[cite: 3]</h1>
               <p className="text-xs text-slate-400">Control de contactos, deudas, estados y archivos en la nube de Firebase.</p>
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
