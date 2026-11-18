@@ -694,7 +694,7 @@ export default function App() {
   }
 
   return (
-    <div className={`${darkMode ? 'dark bg-[#030914] text-slate-100' : 'bg-slate-50 text-slate-900'} h-[100dvh] w-screen flex flex-col overflow-hidden font-sans ${isShaking ? 'msn-buzz-active' : ''}`}>
+    <div className="h-[100dvh] w-screen flex flex-col overflow-hidden bg-[#030914] text-slate-100 font-sans">
       <style>{`
         @keyframes msn-nudge { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-16px, -12px); } 40% { transform: translate(16px, 12px); } 60% { transform: translate(-14px, 10px); } 80% { transform: translate(14px, -10px); } }
         .msn-buzz-active { animation: msn-nudge 0.8s ease-in-out both; }
@@ -707,33 +707,35 @@ export default function App() {
         </div>
       )}
 
-      <div className={`h-12 px-4 border-b ${darkMode ? 'bg-[#071328] border-teal-950' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0`}>
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-teal-600 to-cyan-400 flex items-center justify-center text-slate-950 font-bold text-xs">N</div>
-          <span className="font-bold text-sm tracking-wide text-teal-100">NEFA Software Workspace</span>
+      {/* HEADER PRINCIPAL */}
+      <header className="h-14 px-4 bg-[#071328] border-b border-teal-950 flex items-center justify-between shrink-0 z-20">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-teal-600 to-cyan-400 flex items-center justify-center text-slate-950 font-bold text-sm shadow">N</div>
+          <span className="font-bold text-sm sm:text-base tracking-wide text-teal-100">NEFA Software Workspace</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button onClick={() => setSoundEnabled(!soundEnabled)} className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer border ${soundEnabled ? 'bg-teal-500/20 text-teal-300 border-teal-500/40' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setSoundEnabled(!soundEnabled)} className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer border ${soundEnabled ? 'bg-teal-500/20 text-teal-300 border-teal-500/40' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
             {soundEnabled ? <Bell className="w-3.5 h-3.5 text-teal-400" /> : <BellRing className="w-3.5 h-3.5" />}
-            <span>{soundEnabled ? 'Notificaciones activas' : 'Silenciado'}</span>
+            <span className="hidden sm:inline">{soundEnabled ? 'Notificaciones activas' : 'Silenciado'}</span>
           </button>
-          <div className="flex items-center gap-1 bg-[#030914]/60 p-1 rounded-xl border border-teal-950">
+          <div className="flex items-center gap-1 bg-[#030914] p-1 rounded-xl border border-teal-950">
             <button onClick={() => setActiveTab('chat')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${activeTab === 'chat' ? 'bg-teal-600 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'}`}><MessageSquare className="w-3.5 h-3.5" /> Chat</button>
-            <button onClick={() => setActiveTab('clients')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${activeTab === 'clients' ? 'bg-teal-600 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'}`}><Users className="w-3.5 h-3.5" /> Clientes & Firebase</button>
-            <button onClick={() => setActiveTab('comex')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${activeTab === 'comex' ? 'bg-teal-600 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'}`}><Package className="w-3.5 h-3.5" /> Comex & CBM</button>
+            <button onClick={() => setActiveTab('clients')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${activeTab === 'clients' ? 'bg-teal-600 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'}`}><Users className="w-3.5 h-3.5" /> Clientes</button>
+            <button onClick={() => setActiveTab('comex')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${activeTab === 'comex' ? 'bg-teal-600 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'}`}><Package className="w-3.5 h-3.5" /> Comex</button>
           </div>
         </div>
-      </div>
+      </header>
 
+      {/* CONTENIDO SEGÚN PESTAÑA ACTIVA */}
       {activeTab === 'clients' ? (
         <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 bg-[#030914]">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-teal-100">Gestión de Clientes (Firebase Storage: <span className="text-teal-400 font-mono text-xs">sierraltaemiliano@gmail.com</span>)[cite: 3]</h1>
-              <p className="text-xs text-slate-400">Control de contactos, deudas, estados y archivos en la nube de Firebase.</p>
+              <h1 className="text-xl font-bold tracking-tight text-teal-100">Gestión de Clientes (Firebase Storage)</h1>
+              <p className="text-xs text-slate-400">Control de contactos, deudas, estados y archivos en la nube.</p>
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className={`flex items-center rounded-xl border px-3 py-2 flex-1 sm:w-64 ${darkMode ? 'bg-[#071328] border-teal-950' : 'bg-white border-slate-300'}`}>
+              <div className="flex items-center rounded-xl border px-3 py-2 flex-1 sm:w-64 bg-[#071328] border-teal-950">
                 <Search className="w-4 h-4 text-teal-500 mr-2" />
                 <input type="text" value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} placeholder="Buscar cliente o teléfono..." className="bg-transparent border-0 outline-none text-xs w-full text-slate-100" />
               </div>
@@ -742,40 +744,40 @@ export default function App() {
           </div>
 
           {isAddingClient && (
-            <form onSubmit={handleCreateClient} className={`p-6 rounded-2xl border space-y-4 ${darkMode ? 'bg-[#071328] border-teal-950 shadow-2xl' : 'bg-white border-slate-300'}`}>
-              <h2 className="text-sm font-bold text-teal-400">Registrar Cliente y Enlazar Documentación Firebase</h2>
+            <form onSubmit={handleCreateClient} className="p-6 rounded-2xl border space-y-4 bg-[#071328] border-teal-950 shadow-2xl">
+              <h2 className="text-sm font-bold text-teal-400">Registrar Cliente y Enlazar Documentación</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Nombre:</label><input type="text" required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Juan Pérez" className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-teal-500" /></div>
-                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Empresa:</label><input type="text" value={clientCompany} onChange={(e) => setClientCompany(e.target.value)} placeholder="Empresa S.A." className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-teal-500" /></div>
-                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Teléfono / Contacto:</label><input type="text" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="+54 9 351..." className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-teal-500" /></div>
+                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Nombre:</label><input type="text" required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Juan Pérez" className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none" /></div>
+                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Empresa:</label><input type="text" value={clientCompany} onChange={(e) => setClientCompany(e.target.value)} placeholder="Empresa S.A." className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none" /></div>
+                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Teléfono:</label><input type="text" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="+54 9 351..." className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none" /></div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Estado de Carga:</label>
-                  <select value={clientStatus} onChange={(e) => setClientStatus(e.target.value)} className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-teal-500">
-                    <option value="En origen (China)">📦 En origen (China)</option><option value="En Tránsito">🚢 En Tránsito</option><option value="En Aduana">🛃 En Aduana</option><option value="Listo para Retirar">✅ Listo para Retirar</option>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Estado:</label>
+                  <select value={clientStatus} onChange={(e) => setClientStatus(e.target.value)} className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none">
+                    <option value="En origen (China)">📦 En origen</option><option value="En Tránsito">🚢 En Tránsito</option><option value="En Aduana">🛃 En Aduana</option><option value="Listo para Retirar">✅ Listo</option>
                   </select>
                 </div>
-                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Pagó ($):</label><input type="number" step="0.01" value={clientPaid} onChange={(e) => setClientPaid(e.target.value)} placeholder="0" className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-teal-500" /></div>
-                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Debe ($):</label><input type="number" step="0.01" value={clientDebt} onChange={(e) => setClientDebt(e.target.value)} placeholder="0" className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-teal-500" /></div>
-                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Llegada Est.:</label><input type="text" value={clientArrival} onChange={(e) => setClientArrival(e.target.value)} placeholder="25 de Noviembre" className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-teal-500" /></div>
+                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Pagó ($):</label><input type="number" step="0.01" value={clientPaid} onChange={(e) => setClientPaid(e.target.value)} placeholder="0" className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none" /></div>
+                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Debe ($):</label><input type="number" step="0.01" value={clientDebt} onChange={(e) => setClientDebt(e.target.value)} placeholder="0" className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none" /></div>
+                <div><label className="block text-[11px] font-semibold text-slate-400 mb-1">Llegada Est.:</label><input type="text" value={clientArrival} onChange={(e) => setClientArrival(e.target.value)} placeholder="25 de Noviembre" className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none" /></div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Subir Documento / DNI / Factura (Firebase):</label>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Documento (Firebase):</label>
                   <label className="w-full bg-teal-950/40 border border-teal-500/40 hover:bg-teal-900/40 text-teal-200 rounded-xl px-3 py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer font-semibold">
-                    <Upload className="w-3.5 h-3.5" /> Adjuntar a Firebase
+                    <Upload className="w-3.5 h-3.5" /> Adjuntar archivo
                     <input type="file" onChange={handleUploadToFirebase} className="hidden" />
                   </label>
                 </div>
-                <div className="sm:col-span-4"><label className="block text-[11px] font-semibold text-slate-400 mb-1">Notas / Enlaces de Firebase / CBM:</label><input type="text" value={clientNotes} onChange={(e) => setClientNotes(e.target.value)} placeholder="Notas y links de Firebase..." className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-teal-500" /></div>
+                <div className="sm:col-span-4"><label className="block text-[11px] font-semibold text-slate-400 mb-1">Notas:</label><input type="text" value={clientNotes} onChange={(e) => setClientNotes(e.target.value)} placeholder="Notas y links..." className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white outline-none" /></div>
               </div>
               <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setIsAddingClient(false)} className="px-4 py-2 text-xs text-slate-400">Cancelar</button><button type="submit" className="bg-teal-600 text-slate-950 font-bold px-5 py-2 rounded-xl text-xs">Guardar Cliente</button></div>
             </form>
           )}
 
-          <div className={`rounded-2xl border overflow-hidden ${darkMode ? 'bg-[#071328] border-teal-950' : 'bg-white border-slate-300'}`}>
+          <div className="rounded-2xl border overflow-hidden bg-[#071328] border-teal-950">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className={`border-b text-[11px] uppercase tracking-wider ${darkMode ? 'border-teal-950 bg-[#030914]/60 text-teal-400' : 'border-slate-200 bg-slate-100 text-slate-600'}`}>
-                    <th className="p-3.5">Cliente / Empresa</th><th className="p-3.5">Teléfono / Contacto</th><th className="p-3.5">Estado</th><th className="p-3.5">Pagó ($)</th><th className="p-3.5">Debe ($)</th><th className="p-3.5">Notas y Docs (Firebase)</th><th className="p-3.5 text-right">Acciones</th>
+                  <tr className="border-b text-[11px] uppercase tracking-wider border-teal-950 bg-[#030914]/60 text-teal-400">
+                    <th className="p-3.5">Cliente / Empresa</th><th className="p-3.5">Teléfono</th><th className="p-3.5">Estado</th><th className="p-3.5">Pagó ($)</th><th className="p-3.5">Debe ($)</th><th className="p-3.5">Notas / Archivos</th><th className="p-3.5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-teal-950/60 text-xs">
@@ -783,7 +785,7 @@ export default function App() {
                     <tr><td colSpan={7} className="p-8 text-center text-slate-500">No hay clientes cargados.</td></tr>
                   ) : (
                     filteredClients.map(c => (
-                      <tr key={c.id} className={`${darkMode ? 'hover:bg-teal-950/20' : 'hover:bg-slate-50'}`}>
+                      <tr key={c.id} className="hover:bg-teal-950/20">
                         <td className="p-3.5"><div className="font-bold text-teal-100">{c.name}</div><div className="text-[10px] text-slate-400">{c.company}</div></td>
                         <td className="p-3.5 font-mono text-teal-400">{c.phone || 'Sin teléfono'}</td>
                         <td className="p-3.5"><span className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30">{c.shipment_status}</span></td>
@@ -793,7 +795,7 @@ export default function App() {
                           {c.notes ? (
                             c.notes.includes('http') ? (
                               <a href={c.notes.split('http')[1] ? 'http' + c.notes.split('http')[1].split(' ')[0] : '#'} target="_blank" rel="noreferrer" className="text-teal-400 underline flex items-center gap-1">
-                                <ExternalLink className="w-3 h-3" /> Ver archivo Firebase
+                                <ExternalLink className="w-3 h-3" /> Ver archivo
                               </a>
                             ) : c.notes
                           ) : '-'}
@@ -812,7 +814,7 @@ export default function App() {
           <div><h1 className="text-xl font-bold tracking-tight text-teal-100">Operativa Comex y Calculador CBM</h1><p className="text-xs text-slate-400">Calculá el volumen cúbico y llevá la bitácora de documentación.</p></div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className={`p-6 rounded-2xl border space-y-4 ${darkMode ? 'bg-[#071328] border-teal-950' : 'bg-white border-slate-300'}`}>
+            <div className="p-6 rounded-2xl border space-y-4 bg-[#071328] border-teal-950">
               <div className="flex items-center gap-2 text-teal-400 font-bold text-sm"><Calculator className="w-4 h-4" /> <span>Calculadora Express CBM (m³)</span></div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div><label className="block text-[10px] font-semibold text-slate-400 mb-1">Largo (cm):</label><input type="number" value={boxLength} onChange={(e) => setBoxLength(e.target.value)} placeholder="60" className="w-full bg-[#030914] border border-teal-950 rounded-xl px-3 py-2 text-xs text-white" /></div>
@@ -831,7 +833,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className={`p-6 rounded-2xl border space-y-4 ${darkMode ? 'bg-[#071328] border-teal-950' : 'bg-white border-slate-300'}`}>
+            <div className="p-6 rounded-2xl border space-y-4 bg-[#071328] border-teal-950">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm"><FileText className="w-4 h-4" /> <span>Bitácora Aduanera</span></div>
                 <button onClick={() => setIsAddingShipment(!isAddingShipment)} className="bg-teal-600 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer"><Plus className="w-3.5 h-3.5" /> Nuevo Contenedor</button>
@@ -848,11 +850,11 @@ export default function App() {
             </div>
           </div>
 
-          <div className={`rounded-2xl border overflow-hidden ${darkMode ? 'bg-[#071328] border-teal-950' : 'bg-white border-slate-300'}`}>
+          <div className="rounded-2xl border overflow-hidden bg-[#071328] border-teal-950">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className={`border-b text-[11px] uppercase tracking-wider ${darkMode ? 'border-teal-950 bg-[#030914]/60 text-teal-400' : 'border-slate-200 bg-slate-100 text-slate-600'}`}>
+                  <tr className="border-b text-[11px] uppercase tracking-wider border-teal-950 bg-[#030914]/60 text-teal-400">
                     <th className="p-3.5">Contenedor / BL</th><th className="p-3.5">Cliente</th><th className="p-3.5 text-center">Factura</th><th className="p-3.5 text-center">Packing List</th><th className="p-3.5 text-center">B/L</th><th className="p-3.5 text-center">Cert. Origen</th><th className="p-3.5 text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -861,7 +863,7 @@ export default function App() {
                     <tr><td colSpan={7} className="p-8 text-center text-slate-500">No hay embarques cargados.</td></tr>
                   ) : (
                     shipments.map(s => (
-                      <tr key={s.id} className={`${darkMode ? 'hover:bg-teal-950/20' : 'hover:bg-slate-50'}`}>
+                      <tr key={s.id} className="hover:bg-teal-950/20">
                         <td className="p-3.5 font-bold font-mono text-teal-100">{s.container_code}</td>
                         <td className="p-3.5">{s.client_name}</td>
                         <td className="p-3.5 text-center"><input type="checkbox" checked={s.has_invoice} onChange={() => handleToggleDoc(s.id, 'has_invoice', s.has_invoice)} className="w-4 h-4 rounded accent-teal-500 cursor-pointer" /></td>
@@ -878,19 +880,19 @@ export default function App() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex h-full w-full relative overflow-hidden bg-[#030914]">
+        /* VISTA CHAT PRINCIPAL CON LAYOUT FLEX PROLIJO */
+        <div className="flex-1 flex h-[calc(100vh-3.5rem)] w-full relative overflow-hidden bg-[#030914]">
           {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />}
-          <div className={`fixed md:static inset-y-0 left-0 z-40 w-72 sm:w-80 flex flex-col border-r transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} ${darkMode ? 'bg-[#071328] border-teal-950' : 'bg-white border-slate-200'} shrink-0`}>
-            
-            <div className={`p-4 border-b ${darkMode ? 'border-teal-950' : 'border-slate-200'} flex items-center justify-between`}>
+          
+          {/* SIDEBAR LATERAL */}
+          <div className={`fixed md:static inset-y-0 left-0 z-40 w-72 sm:w-80 flex flex-col border-r transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} bg-[#071328] border-teal-950 shrink-0`}>
+            <div className="p-4 border-b border-teal-950 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-600 to-cyan-400 flex items-center justify-center text-slate-950 font-bold shadow">N</div>
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-teal-600 to-cyan-400 flex items-center justify-center text-slate-950 font-bold shadow">N</div>
                 <div><h1 className="font-bold text-sm text-teal-100">NEFA Software</h1><p className="text-[10px] text-teal-400 font-semibold">● En vivo ({userName})</p></div>
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={handleConfigureGroqKey} className={`p-2 rounded-xl border ${groqApiKey ? 'border-teal-500/40 bg-teal-500/15 text-teal-300' : 'border-teal-950 bg-teal-950/30 text-slate-400'}`} title="Configurar Groq"><Bot className="w-4 h-4" /></button>
-                <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2 rounded-xl border border-teal-950 bg-teal-950/30 text-slate-200" title="Sonido">{soundEnabled ? <Volume2 className="w-4 h-4 text-teal-400" /> : <VolumeX className="w-4 h-4 text-slate-400" />}</button>
-                <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-xl border border-teal-950 bg-teal-950/30 text-yellow-400">{darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}</button>
                 <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-xl md:hidden text-slate-400"><X className="w-5 h-5" /></button>
               </div>
             </div>
@@ -902,7 +904,7 @@ export default function App() {
                   <button onClick={() => setIsAddingChannel(!isAddingChannel)} className="text-xs bg-teal-600 hover:bg-teal-500 text-slate-950 font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer"><Plus className="w-3.5 h-3.5" /> Nuevo</button>
                 </div>
                 {isAddingChannel && (
-                  <div className={`p-3 rounded-xl border mb-3 space-y-2 ${darkMode ? 'bg-[#030914] border-teal-950' : 'bg-slate-100 border-slate-300'}`}>
+                  <div className="p-3 rounded-xl border mb-3 space-y-2 bg-[#030914] border-teal-950">
                     <input type="text" placeholder="Nombre canal..." value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreateChannel()} autoFocus className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-teal-900 text-white outline-none focus:border-teal-500" />
                     <input type="text" placeholder="Descripción" value={newChannelDesc} onChange={(e) => setNewChannelDesc(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreateChannel()} className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-transparent border border-teal-900 text-white outline-none focus:border-teal-500" />
                     <div className="flex justify-end gap-2 pt-1"><button onClick={() => setIsAddingChannel(false)} className="text-xs text-slate-400 px-2 py-1">Cancelar</button><button onClick={handleCreateChannel} className="text-xs bg-teal-600 text-slate-950 font-bold px-3 py-1 rounded-lg">Crear</button></div>
@@ -949,7 +951,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className={`p-3 border-t ${darkMode ? 'border-teal-950 bg-[#030914]/40' : 'border-slate-200 bg-slate-50'} space-y-2`}>
+            <div className="p-3 border-t border-teal-950 bg-[#030914]/40 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5 truncate">
                   <div className="w-8 h-8 rounded-full bg-teal-600 text-slate-950 font-bold flex items-center justify-center text-xs shrink-0">{userName.substring(0, 2).toUpperCase()}</div>
@@ -963,15 +965,16 @@ export default function App() {
             </div>
           </div>
 
+          {/* ÁREA CENTRAL DE CHAT */}
           <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-[#030914]">
-            <div className={`h-14 sm:h-16 px-3 sm:px-6 border-b ${darkMode ? 'bg-[#071328] border-teal-950' : 'bg-white border-slate-200'} flex items-center justify-between shrink-0 gap-2`}>
+            <div className="h-14 px-4 sm:px-6 border-b bg-[#071328] border-teal-950 flex items-center justify-between shrink-0 gap-2">
               <div className="flex items-center gap-2.5 truncate">
                 <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-xl border md:hidden bg-teal-950/50 border-teal-900 text-slate-200"><Menu className="w-5 h-5" /></button>
                 <div className="truncate"><h2 className="font-bold text-sm sm:text-base truncate text-teal-100"># {activeChannel?.name || 'general'}</h2><p className="text-[10px] sm:text-xs text-slate-400 truncate">{activeChannel?.description || 'Canal de equipo'}</p></div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {searchOpen ? (
-                  <div className={`flex items-center rounded-xl border px-2.5 py-1.5 ${darkMode ? 'bg-[#030914] border-teal-900' : 'bg-slate-100 border-slate-300'}`}>
+                  <div className="flex items-center rounded-xl border px-2.5 py-1.5 bg-[#030914] border-teal-900">
                     <Search className="w-3.5 h-3.5 text-teal-500 mr-1.5" />
                     <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar..." autoFocus className="bg-transparent outline-none text-xs w-28 sm:w-40 text-slate-100" />
                     <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} className="text-slate-400 hover:text-white ml-1"><X className="w-3.5 h-3.5" /></button>
@@ -995,6 +998,7 @@ export default function App() {
               </div>
             )}
 
+            {/* MENSAJES */}
             <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 bg-[#030914]">
               {displayedMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center opacity-50 text-xs text-slate-400"><Hash className="w-8 h-8 mb-2 text-teal-600" /><p>No hay mensajes en este canal todavía.</p></div>
@@ -1064,6 +1068,7 @@ export default function App() {
               </div>
             )}
 
+            {/* INPUT DE MENSAJE */}
             <div className="p-2.5 sm:p-4 border-t bg-[#071328] border-teal-950 shrink-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <label className="p-2.5 sm:p-3 rounded-xl border border-teal-950 bg-teal-950/40 text-teal-300 cursor-pointer shrink-0 hover:bg-teal-950"><Paperclip className="w-4 h-4" /><input type="file" onChange={handleFileUpload} className="hidden" /></label>
